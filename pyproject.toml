@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "patchwork"
+version = "0.1.0"
+description = "训练模型工具集"
+requires-python = ">=3.10"
+dependencies = [
+  "pyside6>=6.5",
+  "PySide6-Fluent-Widgets",
+  "supervision",
+  "ultralytics>=8.3.0",
+  "pillow",
+  "numpy",
+  "pyyaml",
+  "paramiko",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pyinstaller",
+  "python-semantic-release",
+]
+
+[tool.setuptools]
+packages = ["app", "app.widgets", "app.services", "app.formats", "app.utils"]

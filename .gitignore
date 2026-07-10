@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.spec
+
+# 虚拟环境
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# 日志
+logs/
+
+# 模型文件（太大了）
+*.pt
+*.pth
+*.onnx
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+/.claude
+/可见光级联
+/output_panel_crop
+/PROJECT_BOOTSTRAP.md
