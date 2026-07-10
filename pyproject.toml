@@ -25,4 +25,4 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["app", "app.widgets", "app.services", "app.formats", "app.utils"]
+packages = ["app", "app.widgets", "app.services", "app.utils"]
