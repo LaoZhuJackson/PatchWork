@@ -9,6 +9,7 @@ from app.widgets.dataset_split import DatasetSplitPanel
 from app.widgets.export_onnx import ExportONNXPanel
 from app.widgets.label_preview import LabelPreviewPanel
 from app.widgets.model_infer import ModelInferPanel
+from app.widgets.video_extract import VideoExtractPanel
 
 
 class MainWindow(FluentWindow):
@@ -26,6 +27,7 @@ class MainWindow(FluentWindow):
             "model_infer": ModelInferPanel(),
             "label_preview": LabelPreviewPanel(),
             "export_onnx": ExportONNXPanel(),
+            "video_extract": VideoExtractPanel(),
             "gpu_monitor": QLabel("🖥️ GPU监控"),
             "xanylabeling": QLabel("🔧 X-AnyLabeling"),
         }
@@ -57,6 +59,11 @@ class MainWindow(FluentWindow):
         self.addSubInterface(
             self._placeholder["export_onnx"],
             FIF.SAVE_AS, "导出ONNX",
+            position=NavigationItemPosition.TOP,
+        )
+        self.addSubInterface(
+            self._placeholder["video_extract"],
+            FIF.MEDIA, "视频抽帧",
             position=NavigationItemPosition.TOP,
         )
         self.addSubInterface(

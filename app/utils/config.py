@@ -35,3 +35,11 @@ def get_bool(key: str, default: bool = False) -> bool:
 
 def set_bool(key: str, value: bool) -> None:
     SETTINGS.setValue(key, value)
+
+
+def get_float(key: str, default: float = 0.0) -> float:
+    return float(_get(key, default))
+
+
+def set_float(key: str, value: float) -> None:
+    SETTINGS.setValue(key, value)
