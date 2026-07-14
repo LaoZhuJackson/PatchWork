@@ -33,12 +33,13 @@ from app.utils.worker import Worker
 class ExtractWorker(Worker):
     """后台抽帧"""
 
-    def __int__(self, video_path: str, output_dir: str, mode: str, interval: float) -> None:
+    def __init__(self, video_path: str, output_dir: str, mode: str, interval: float, fmt: str) -> None:
         super().__init__()
         self.video_path = video_path
         self.output_dir = output_dir
         self.mode = mode
         self.interval = interval
+        self.fmt = fmt
 
     def do_work(self) -> dict:
         return extract_frames(
@@ -46,6 +47,7 @@ class ExtractWorker(Worker):
             self.output_dir,
             self.mode,
             self.interval,
+            self.fmt,
             progress_callback=lambda p: self.progress.emit(p),
         )
 
@@ -287,6 +289,8 @@ class VideoExtractPanel(QWidget):
 
         mode = "frame" if self._mode_group.checkedId() == 1 else "time"
         interval = float(self.interval_spin.value())
+        fmt = self.fmt_combo.currentText()
+
         if mode == "time":
             set_float("extract_time_interval", interval)
         else:
@@ -297,7 +301,7 @@ class VideoExtractPanel(QWidget):
         self.progress.setValue(0)
         self.status_label.setText("正在抽帧...")
 
-        self._worker = ExtractWorker(video, out, mode, interval)
+        self._worker = ExtractWorker(video, out, mode, interval, fmt)
         self._worker.finished.connect(self._on_finished)
         self._worker.error.connect(self._on_error)
         self._worker.progress.connect(self.progress.setValue)

@@ -4,102 +4,79 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**PatchWork** — a PySide6 desktop GUI application that integrates multiple PV defect-detection utility scripts into a single visual tool. Target users are the developer and colleagues; distributed as a single `.exe` via PyInstaller.
-
-Full background and rationale: `PROJECT_BOOTSTRAP.md`.
+**PatchWork** — a PySide6 + QFluentWidgets desktop GUI that bundles several PV (photovoltaic) defect-detection utilities into one tool. Target users are the developer and colleagues; distributed as a single `.exe` via PyInstaller. Full background: `PROJECT_BOOTSTRAP.md` (if present) and `README.md`. UI strings and code comments are in Chinese.
 
 ## Tech Stack
 
-- **Python 3.10** (conda environment)
-- **GUI**: PySide6 (LGPL, QGraphicsView for image preview + annotation overlays)
+- **Python ≥ 3.10** (conda env, typically named `patchwork`)
+- **GUI**: PySide6 + [QFluentWidgets](https://qfluentwidgets.com/) (`qfluentwidgets`, package `PySide6-Fluent-Widgets`) — Fluent Design widgets and `FluentWindow` navigation
+- **Image preview**: `QGraphicsView` (see `app/widgets/image_viewer.py`)
+- **ML / inference**: `ultralytics` (YOLO) + `supervision` (`sv.Detections.from_ultralytics`); `opencv` (transitively via ultralytics) is imported directly in `inference.py`
 - **Packaging**: PyInstaller → single `.exe`
-- **SSH**: paramiko (pure Python, no system ssh dependency)
-- **ML**: ultralytics (YOLO), numpy, Pillow
-- **Changelog**: python-semantic-release (auto from commits)
-- **CI/CD**: GitHub Actions (push tag → build + package + release)
+- **SSH** (planned features): `paramiko`
 
 ## Commands
 
 ```bash
-# Activate conda environment
-conda activate <env-name>
-
-# Run the app (during development)
-python main.py
-
-# Package as single exe
-pyinstaller --onefile --windowed main.py
-
-# Semantic release (changelog + GitHub release)
-semantic-release version
+conda activate patchwork          # activate env
+pip install -e .                  # install app + deps (editable); use .[dev] for pyinstaller/semantic-release
+python main.py                    # run the app during development
+pyinstaller --onefile --windowed main.py   # package as a single windowed exe
 ```
+
+There are no automated tests. Verify changes by running `python main.py` and exercising the relevant panel.
 
 ## Architecture
 
+Three layers, strictly one-directional: **widgets (UI) → services (logic, no Qt-UI) → utils (infra)**.
+
 ```
-laozhu-gui/
-├── main.py                     # Entry point
-├── pyproject.toml              # Project metadata + dependencies
-├── .github/
-│   └── workflows/
-│       └── release.yml         # CI: changelog + build + release
-├── app/
-│   ├── main_window.py          # QMainWindow: sidebar nav (QListWidget) + QStackedWidget
-│   ├── widgets/                # One panel per feature (F1–F7), all independent
-│   │   ├── image_viewer.py     # Shared QGraphicsView component: zoom, pan, overlay
-│   │   ├── dataset_split.py    # F1
-│   │   ├── model_infer.py      # F2 (most complex: thumbnail list + inference + preview)
-│   │   ├── check_pair.py       # F3
-│   │   ├── label_preview.py    # F4
-│   │   ├── export_onnx.py      # F5
-│   │   ├── gpu_monitor.py      # F6
-│   │   └── xanylabeling.py     # F7
-│   ├── services/               # Business logic, no UI
-│   │   ├── splitter.py         # Dataset splitting (ported from devide.py)
-│   │   ├── checker.py          # Image/label pairing (ported from check_image_label.py)
-│   │   ├── label_reader.py     # YOLO label parsing + coordinate denormalization
-│   │   ├── exporter.py         # ONNX export wrapper around ultralytics
-│   │   ├── inference.py        # Inference engine (QThread)
-│   │   ├── gpu_client.py       # SSH + nvidia-smi parsing (paramiko)
-│   │   └── xanylabeling.py     # subprocess wrapper
-│   ├── formats/
-│   │   ├── base.py             # BaseFormat abstract base class
-│   │   ├── yolo_detect.py      # YOLO detection format
-│   │   ├── yolo_segment.py     # YOLO segmentation (reserved)
-│   │   └── coco.py             # COCO format (reserved)
-│   └── utils/
-│       ├── config.py           # QSettings persistence
-│       └── worker.py           # QThread Worker base class
-└── resources/
-    └── icon.png
+main.py                     # entry: builds QApplication, wires logging→popup bridge, shows MainWindow
+app/
+├── main_window.py          # FluentWindow: registers each panel as a nav sub-interface
+├── widgets/                # one QWidget panel per feature; panels are mutually independent
+│   ├── image_viewer.py     # shared QGraphicsView: zoom (wheel), pan (drag), bbox/polygon/text overlays
+│   ├── dataset_split.py    # 数据集划分 — pairing check + train/val/test split (copy or move)
+│   ├── model_infer.py      # 模型推理 — model load + click-to-infer + overlay preview
+│   ├── label_preview.py    # Label 预览 — draw YOLO labels over images
+│   └── export_onnx.py      # 导出 ONNX — YOLO .pt → ONNX
+├── services/               # pure logic, no widget imports; safe to call from a Worker thread
+│   ├── splitter.py         # find_pairs() + split_dataset()
+│   ├── inference.py        # InferenceEngine: load once, infer() → annotation dicts (det + seg)
+│   ├── label_reader.py     # parse_yolo_label() denormalize; CLASS_COLORS + get_color()
+│   └── exporter.py         # ONNXExporter wrapping ultralytics model.export
+└── utils/
+    ├── worker.py           # Worker(QThread) base — override do_work(), emits finished/error/progress
+    ├── logger.py           # logging setup + Qt signal bridge (WARNING+ → popup)
+    ├── message.py          # MessageBox helpers: info/warning/error/confirm
+    └── config.py           # QSettings("PatchWork","PatchWork") get/set str/int/bool
 ```
 
-## Key Design Principles
+`GPU 监控` and `X-AnyLabeling` appear in the nav but are currently bare `QLabel` placeholders in `main_window.py` — their services/widgets do not exist yet. `README.md` also lists 视频抽帧 and 最优置信度 as planned (⏳).
 
-1. **Format plugin system** — `BaseFormat` abstract base class defines `find_pairs()`, `get_label_extension()`, etc. F1/F3/F4 depend on the base class, not concrete implementations. Add new formats by subclassing.
-2. **Async via QThread** — model loading, inference, SSH connections, and batch file operations all run in `QThread` workers. Results and progress communicated via signals/slots. Never block the UI thread.
-3. **Lazy loading** — image lists load only viewport-visible thumbnails. Large images are not held in memory.
-4. **QSettings for all config** — every file path input, SSH host/user, and external exe path is persisted. **Do not store SSH passwords** — prompt each session or require key auth.
-5. **Panels are independent** — each widget in `app/widgets/` has no dependencies on other panels. They can be developed and tested in isolation.
-6. **Click-to-infer** — F2 model inference runs on-demand when a thumbnail is clicked, not pre-computed across the whole folder. Saves resources.
+## Key Patterns & Conventions
 
-## Existing Scripts to Port
+**Async via `Worker` (`app/utils/worker.py`).** Any blocking work (model load, inference, file copy/move, future SSH) runs off the UI thread. Subclass `Worker`, put the work in `do_work()` (its return value is emitted via `finished`), and connect `finished`/`error`/`progress` before `.start()`. Services accept an optional `progress_callback` that the Worker wires to `self.progress.emit`. Store the worker on `self._worker` so it isn't garbage-collected mid-run. See `SplitWorker`, `LoadModelWorker`, `InferWorker`.
 
-The original utility scripts are in the current directory and will be ported into `app/services/`:
+**Annotation dict — the contract between services and `ImageViewer`.** Both `label_reader.parse_yolo_label()` and `InferenceEngine.infer()` return `list[dict]` with the *same* shape, and every panel renders them by looping and dispatching on `type`:
+```python
+{"type": "bbox",    "rect": QRectF, "class_id": int, "color": QColor, "label": str}
+{"type": "polygon", "points": [QPointF, ...], "class_id": int, "color": QColor, "label": str}
+```
+Consume with `viewer.add_bbox(ann["rect"], ann["color"], ann["label"])` / `viewer.add_polygon(...)`. Keep this shape stable when adding formats or detectors.
 
-| Script | Ported to |
-|--------|-----------|
-| `devide.py` | `app/services/splitter.py` (F1) |
-| `check_image_label.py` | `app/services/checker.py` (F3) |
+**Per-class colors.** `label_reader.get_color(class_id)` cycles a fixed 20-color `CLASS_COLORS` list; both label preview and inference use it so a class keeps its color across panels.
 
-## Development Order
+**Logging doubles as user alerts.** `setup_logging()` (called once in `main.py`) installs a `QtLogHandler` that emits any **WARNING/ERROR/CRITICAL** log record over a Qt signal, which `main.py` turns into a `MessageBox` popup. So `get_logger(__name__).warning(...)` both writes to `logs/patchwork_<date>.log` and pops a dialog — don't log at WARNING+ for routine/expected conditions. Use `app.utils.message` (`info/warning/error/confirm`) for direct, intentional dialogs.
 
-1. Project skeleton + main window (sidebar nav + QStackedWidget with blank panels)
-2. F1 — Dataset split (simplest, validates the architecture pattern)
-3. F4 — Label preview (builds `ImageViewer`, needed by F2)
-4. F2 — Model inference + image preview (core, most complex)
-5. F3 — Image/label pairing check (quick)
-6. F5 — ONNX export
-7. F6 — GPU monitor (SSH-dependent, independent)
-8. F7 — X-AnyLabeling launcher (trivial)
-9. Packaging + CI/CD
+**Config persistence.** Every path/host/option the user picks is saved via `app/utils/config.py` (QSettings) and restored in each panel's `_load_settings()`. Keys are plain strings (e.g. `img_dir`, `infer_model_path`). **Never persist SSH passwords** — prompt per session or require key auth.
+
+**Adding a panel.** Create `app/widgets/<name>.py` as a self-contained `QWidget` with a unique `setObjectName(...)` (QFluentWidgets requires it for navigation), then register it in `MainWindow._register_navigation()` via `addSubInterface(widget, FIF.<icon>, "<label>", position=...)`.
+
+## Gotchas
+
+- **`formats/` was removed.** Earlier docs described a `BaseFormat` plugin system in `app/formats/`; that module was deleted (and dropped from `pyproject.toml` to fix `pip install`). Do not reintroduce references to it. YOLO-format logic now lives directly in `splitter.py` / `label_reader.py`.
+- **`exporter.py` `chdir`.** ultralytics `model.export()` writes ONNX to the current working directory, so `ONNXExporter.export` temporarily `os.chdir` into the target dir and restores it in a `finally`.
+- **YOLOv12 weight/version mismatch.** `InferenceEngine.load_model` catches the `AttributeError` (`qkv`/`AAttn`) and re-raises a `RuntimeError` with an upgrade hint — preserve that when touching model loading.
+- **Thumbnails are loaded eagerly.** `model_infer.py` / `label_preview.py` build a full `QPixmap` thumbnail for every image up front (not viewport-lazy). Keep this in mind for very large folders.
+- **Commits use Conventional Commits** (`fix:`, `feat:`, `init:` …); `python-semantic-release` is a dev dependency for changelog/release, though no `[tool.semantic_release]` config is committed yet.

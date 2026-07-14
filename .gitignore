@@ -18,7 +18,7 @@ env/
 # 日志
 logs/
 
-# 模型文件（太大了）
+# 模型文件
 *.pt
 *.pth
 *.onnx
@@ -31,3 +31,4 @@ Thumbs.db
 /可见光级联
 /output_panel_crop
 /PROJECT_BOOTSTRAP.md
+CLAUDE.md
