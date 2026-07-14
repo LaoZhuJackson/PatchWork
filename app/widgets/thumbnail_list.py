@@ -129,9 +129,8 @@ class ThumbnailList(QWidget):
         self._thumbs_loaded = end
 
     def _on_scrolled(self, value: int) -> None:
-        bar = self._list.horizontalScrollBar()
-        if value >= bar.maximum() - 300:
-            self._load_batch()
+        """滚动时就加载下一批"""
+        self._load_batch()
 
     def _wheel_event(self, event) -> None:
         delta = event.angleDelta().y()

@@ -89,7 +89,7 @@ class ModelInferPanel(QWidget):
 
         model_row = QHBoxLayout()
 
-        model_row.addWidget(BodyLabel("模型:"))
+        model_row.addWidget(BodyLabel("模型目录:"))
         self.model_edit = LineEdit()
         self.model_edit.setPlaceholderText("选择 YOLO .pt 模型文件...")
         self.model_edit.setReadOnly(True)
