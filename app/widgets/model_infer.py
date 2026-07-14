@@ -3,24 +3,23 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFileDialog,
     QGroupBox,
     QHBoxLayout,
     QVBoxLayout,
-    QWidget,
+    QWidget, QFormLayout,
 )
 from qfluentwidgets import (
     PushButton,
     LineEdit,
     SubtitleLabel,
-    BodyLabel,
+    BodyLabel, DoubleSpinBox,
 )
 
 from app.services.inference import InferenceEngine
 from app.services.label_reader import IMAGE_EXTS
-from app.utils.config import get_str, set_str
+from app.utils.config import get_str, set_str, set_float, get_float
 from app.utils.message import error
 from app.utils.worker import Worker
 from app.widgets.image_browser import ImageBrowser
@@ -47,13 +46,15 @@ class LoadModelWorker(Worker):
 class InferWorker(Worker):
     """后台推理单张图片"""
 
-    def __init__(self, engine: InferenceEngine, image_path: Path) -> None:
+    def __init__(self, engine: InferenceEngine, image_path: Path, conf: float, iou: float) -> None:
         super().__init__()
         self.engine = engine
         self.image_path = image_path
+        self.conf = conf
+        self.iou = iou
 
     def do_work(self) -> list[dict]:
-        return self.engine.infer(self.image_path)
+        return self.engine.infer(self.image_path, self.conf, self.iou)
 
 
 # ---- Panel ----
@@ -84,29 +85,66 @@ class ModelInferPanel(QWidget):
 
         # ---- 工具栏 ----
         toolbar_group = QGroupBox("")
-        toolbar = QHBoxLayout(toolbar_group)
-        toolbar.setContentsMargins(12, 8, 12, 8)
-        toolbar.setSpacing(12)
+        tool_form = QFormLayout(toolbar_group)
+        model_row = QHBoxLayout()
 
-        toolbar.addWidget(BodyLabel("模型:"))
+        model_row.addWidget(BodyLabel("模型:"))
         self.model_edit = LineEdit()
         self.model_edit.setPlaceholderText("选择 YOLO .pt 模型文件...")
         self.model_edit.setReadOnly(True)
-        toolbar.addWidget(self.model_edit, 1)
+        model_row.addWidget(self.model_edit, 1)
 
         model_btn = PushButton("浏览...")
         model_btn.clicked.connect(self._browse_model)
-        toolbar.addWidget(model_btn)
+        model_row.addWidget(model_btn)
+        tool_form.addRow(model_row)
 
-        toolbar.addWidget(BodyLabel("图片目录:"))
+        img_row = QHBoxLayout()
+        img_row.addWidget(BodyLabel("图片目录:"))
         self.folder_edit = LineEdit()
         self.folder_edit.setPlaceholderText("选择图片文件夹...")
         self.folder_edit.setReadOnly(True)
-        toolbar.addWidget(self.folder_edit, 1)
+        img_row.addWidget(self.folder_edit, 1)
 
         folder_btn = PushButton("浏览...")
         folder_btn.clicked.connect(self._browse_folder)
-        toolbar.addWidget(folder_btn)
+        img_row.addWidget(folder_btn)
+        tool_form.addRow(img_row)
+
+        # ---- 阈值设置 ----
+        threshold_row = QHBoxLayout()
+        threshold_row.addWidget(BodyLabel("Conf:"))
+        self.conf_spin = DoubleSpinBox()
+        self.conf_spin.setRange(0.01, 1.0)
+        self.conf_spin.setSingleStep(0.05)
+        self.conf_spin.setDecimals(2)
+        self.conf_spin.setValue(0.25)
+        self.conf_spin.setToolTip("置信度阈值")
+        self.conf_spin.valueChanged.connect(
+            lambda v: set_float("infer_conf", v)
+        )
+        threshold_row.addWidget(self.conf_spin)
+
+        threshold_row.addWidget(BodyLabel("IoU:"))
+        self.iou_spin = DoubleSpinBox()
+        self.iou_spin.setRange(0.01, 1.0)
+        self.iou_spin.setSingleStep(0.05)
+        self.iou_spin.setDecimals(2)
+        self.iou_spin.setValue(0.45)
+        self.iou_spin.setToolTip("NMS IoU 阈值")
+        self.iou_spin.valueChanged.connect(
+            lambda v: set_float("infer_iou", v)
+        )
+        threshold_row.addWidget(self.iou_spin)
+
+        self.reinfer_btn = PushButton("重新推理")
+        self.reinfer_btn.setToolTip("用当前阈值对当前图片重新推理")
+        self.reinfer_btn.clicked.connect(self._on_reinfer)
+        threshold_row.addWidget(self.reinfer_btn)
+
+        threshold_row.addStretch()
+
+        tool_form.addRow(threshold_row)
 
         layout.addWidget(toolbar_group)
 
@@ -212,7 +250,10 @@ class ModelInferPanel(QWidget):
         self._update_ui_state()
         self.status_label.setText(f"正在推理: {path.name} ...")
 
-        self._infer_worker = InferWorker(self._engine, path)
+        conf = self.conf_spin.value()
+        iou = self.iou_spin.value()
+
+        self._infer_worker = InferWorker(self._engine, path, conf, iou)
         self._infer_worker.finished.connect(self._on_infer_done)
         self._infer_worker.error.connect(self._on_infer_error)
         self._infer_worker.start()
@@ -236,11 +277,18 @@ class ModelInferPanel(QWidget):
         """推理中禁用图片列表"""
         self.browser.thumb_list.setDisabled(self._inferring)
 
+    def _on_reinfer(self) -> None:
+        """手动触发重新推理"""
+        if self._engine.is_loaded and self.browser.current_path is not None:
+            self._run_inference()
+
     # ---- 持久化 ----
 
     def _load_settings(self) -> None:
         self.model_edit.setText(get_str("infer_model_path"))
         self.folder_edit.setText(get_str("infer_folder_path"))
+        self.conf_spin.setValue(get_float("infer_conf", 0.25))
+        self.iou_spin.setValue(get_float("infer_iou", 0.45))
 
         model_path = get_str("infer_model_path")
         if model_path and Path(model_path).is_file():

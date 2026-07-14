@@ -61,7 +61,7 @@ class InferenceEngine:
         overrides = self._model.overrides
         self._task = overrides.get("task", "")
 
-    def infer(self, image_path: str | Path) -> list[dict]:
+    def infer(self, image_path: str | Path, conf: float = 0.25, iou: float = 0.45) -> list[dict]:
         """对单张图片推理，返回标注列表。
 
         - detect 模型: 返回 bbox
@@ -70,7 +70,7 @@ class InferenceEngine:
         if self._model is None:
             raise RuntimeError("模型未加载")
 
-        results = self._model(str(image_path), verbose=False)
+        results = self._model(str(image_path), conf=conf, iou=iou, verbose=False)
         results = results[0]
 
         detections = sv.Detections.from_ultralytics(results)
