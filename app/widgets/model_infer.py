@@ -4,17 +4,15 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtWidgets import (
+    QDoubleSpinBox,
     QFileDialog,
-    QGroupBox,
     QHBoxLayout,
     QVBoxLayout,
-    QWidget, QFormLayout,
+    QWidget,
 )
 from qfluentwidgets import (
-    PushButton,
-    LineEdit,
-    SubtitleLabel,
-    BodyLabel, DoubleSpinBox,
+    PushButton, PrimaryPushButton, LineEdit,
+    BodyLabel, SubtitleLabel, CardWidget, DoubleSpinBox,
 )
 
 from app.services.inference import InferenceEngine
@@ -84,8 +82,11 @@ class ModelInferPanel(QWidget):
         layout.addWidget(SubtitleLabel("模型推理"))
 
         # ---- 工具栏 ----
-        toolbar_group = QGroupBox("")
-        tool_form = QFormLayout(toolbar_group)
+        toolbar_card = CardWidget()
+        toolbar = QVBoxLayout(toolbar_card)
+        toolbar.setContentsMargins(12, 8, 12, 8)
+        toolbar.setSpacing(8)
+
         model_row = QHBoxLayout()
 
         model_row.addWidget(BodyLabel("模型:"))
@@ -97,7 +98,7 @@ class ModelInferPanel(QWidget):
         model_btn = PushButton("浏览...")
         model_btn.clicked.connect(self._browse_model)
         model_row.addWidget(model_btn)
-        tool_form.addRow(model_row)
+        toolbar.addLayout(model_row)
 
         img_row = QHBoxLayout()
         img_row.addWidget(BodyLabel("图片目录:"))
@@ -109,7 +110,7 @@ class ModelInferPanel(QWidget):
         folder_btn = PushButton("浏览...")
         folder_btn.clicked.connect(self._browse_folder)
         img_row.addWidget(folder_btn)
-        tool_form.addRow(img_row)
+        toolbar.addLayout(img_row)
 
         # ---- 阈值设置 ----
         threshold_row = QHBoxLayout()
@@ -137,16 +138,16 @@ class ModelInferPanel(QWidget):
         )
         threshold_row.addWidget(self.iou_spin)
 
-        self.reinfer_btn = PushButton("重新推理")
+        self.reinfer_btn = PrimaryPushButton("重新推理")
         self.reinfer_btn.setToolTip("用当前阈值对当前图片重新推理")
         self.reinfer_btn.clicked.connect(self._on_reinfer)
         threshold_row.addWidget(self.reinfer_btn)
 
         threshold_row.addStretch()
 
-        tool_form.addRow(threshold_row)
+        toolbar.addLayout(threshold_row)
 
-        layout.addWidget(toolbar_group)
+        layout.addWidget(toolbar_card)
 
         # ---- 状态标签 ----
         self.status_label = BodyLabel("请先导入模型并选择图片目录")

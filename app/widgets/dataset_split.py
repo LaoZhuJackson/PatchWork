@@ -6,13 +6,15 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
-    QGroupBox,
     QHBoxLayout,
     QVBoxLayout,
     QWidget,
 )
-from qfluentwidgets import PushButton, LineEdit, ProgressBar, BodyLabel, SubtitleLabel, Slider, CheckBox, \
-    PrimaryPushButton
+from qfluentwidgets import (
+    PushButton, PrimaryPushButton, LineEdit, ProgressBar,
+    BodyLabel, StrongBodyLabel, SubtitleLabel,
+    Slider, CheckBox, CardWidget,
+)
 
 from app.services.splitter import split_dataset, IMAGE_EXTS, find_pairs
 from app.utils.config import get_str, set_str, set_bool, set_int, get_int, get_bool
@@ -56,7 +58,6 @@ class SplitWorker(Worker):
 class DatasetSplitPanel(QWidget):
     """数据集划分面板"""
 
-    # 通知主窗口更新状态栏
     status_message = Signal(str)
 
     def __init__(self):
@@ -75,9 +76,10 @@ class DatasetSplitPanel(QWidget):
         # ---- 标题 ----
         layout.addWidget(SubtitleLabel("数据集划分"))
 
-        # ---- 路径选择 ----
-        path_group = QGroupBox("路径设置")
-        path_outer = QVBoxLayout(path_group)
+        # ---- 路径设置 ----
+        layout.addWidget(StrongBodyLabel("路径设置"))
+        path_card = CardWidget()
+        path_outer = QVBoxLayout(path_card)
         path_form = QFormLayout()
         path_outer.addLayout(path_form)
 
@@ -87,7 +89,7 @@ class DatasetSplitPanel(QWidget):
         img_row = QHBoxLayout()
         img_row.addWidget(self.img_edit, 1)
         img_row.addWidget(img_btn)
-        path_form.addRow("图片目录:", img_row)
+        path_form.addRow(BodyLabel("图片目录:"), img_row)
 
         self.lbl_edit = LineEdit()
         lbl_btn = PushButton("浏览...")
@@ -95,7 +97,7 @@ class DatasetSplitPanel(QWidget):
         lbl_row = QHBoxLayout()
         lbl_row.addWidget(self.lbl_edit, 1)
         lbl_row.addWidget(lbl_btn)
-        path_form.addRow("标签目录:", lbl_row)
+        path_form.addRow(BodyLabel("标签目录:"), lbl_row)
 
         self.out_edit = LineEdit()
         out_btn = PushButton("浏览...")
@@ -103,17 +105,17 @@ class DatasetSplitPanel(QWidget):
         out_row = QHBoxLayout()
         out_row.addWidget(self.out_edit, 1)
         out_row.addWidget(out_btn)
-        path_form.addRow("输出目录:", out_row)
+        path_form.addRow(BodyLabel("输出目录:"), out_row)
 
-        # 配对状态
         self.pair_status = BodyLabel("")
         path_outer.addWidget(self.pair_status)
 
-        layout.addWidget(path_group)
+        layout.addWidget(path_card)
 
-        # ---- 比例调节 ----
-        ratio_group = QGroupBox("划分比例")
-        ratio_layout = QVBoxLayout(ratio_group)
+        # ---- 划分比例 ----
+        layout.addWidget(StrongBodyLabel("划分比例"))
+        ratio_card = CardWidget()
+        ratio_layout = QVBoxLayout(ratio_card)
 
         self.train_slider = Slider(Qt.Orientation.Horizontal)
         self.train_slider.setRange(50, 90)
@@ -138,7 +140,7 @@ class DatasetSplitPanel(QWidget):
         ratio_layout.addWidget(self.test_slider)
         ratio_layout.addWidget(self.ratio_label)
 
-        layout.addWidget(ratio_group)
+        layout.addWidget(ratio_card)
 
         # ---- 底部操作栏 ----
         bottom_row = QHBoxLayout()
@@ -173,8 +175,8 @@ class DatasetSplitPanel(QWidget):
         if path:
             edit.setText(path)
             set_str(key, path)
-            self._on_ratios_changed()  # 更新划分图片数量
-            self._refresh_pair_status()  # 更新配对情况
+            self._on_ratios_changed()
+            self._refresh_pair_status()
 
     # ---- 配对检查 ----
     def _current_dirs(self) -> tuple[Path | None, Path | None]:
@@ -244,7 +246,6 @@ class DatasetSplitPanel(QWidget):
         s = self.test_slider.value()
         total = t + v + s
 
-        # 获取已配对总数
         img_dir, lbl_dir = self._current_dirs()
         pair_count = 0
         if img_dir and lbl_dir:
@@ -266,7 +267,6 @@ class DatasetSplitPanel(QWidget):
                 f"验证集 {v * 100 / total:.0f}%  |  "
                 f"测试集 {s * 100 / total:.0f}%"
             )
-        # 持久化
         set_int("split_train", t)
         set_int("split_val", v)
         set_int("split_test", s)
@@ -276,13 +276,11 @@ class DatasetSplitPanel(QWidget):
         self.lbl_edit.setText(get_str("lbl_dir"))
         self.out_edit.setText(get_str("out_dir"))
 
-        # 恢复滑动条
         if get_int("split_train") > 0:
             self.train_slider.setValue(get_int("split_train"))
             self.val_slider.setValue(get_int("split_val"))
             self.test_slider.setValue(get_int("split_test"))
 
-        # 恢复勾选框
         self.move_checkbox.setChecked(get_bool("split_move_mode"))
 
         self._refresh_pair_status()
@@ -306,10 +304,8 @@ class DatasetSplitPanel(QWidget):
 
         out.mkdir(parents=True, exist_ok=True)
 
-        # 检查输出目录
         contents = list(out.iterdir())
         if contents and mode == "move":
-            # 统计
             img_count = sum(
                 1 for f in out.rglob("*") if f.suffix.lower() in IMAGE_EXTS
             )
@@ -322,14 +318,12 @@ class DatasetSplitPanel(QWidget):
             ):
                 return
 
-            # 清空
             for item in out.iterdir():
                 if item.is_dir():
                     shutil.rmtree(item)
                 else:
                     item.unlink()
 
-        # 开始划分
         t = self.train_slider.value()
         v = self.val_slider.value()
         s = self.test_slider.value()
@@ -338,8 +332,6 @@ class DatasetSplitPanel(QWidget):
         self.split_btn.setEnabled(False)
         self.progress.setVisible(True)
         self.progress.setValue(0)
-
-        mode = "move" if self.move_checkbox.isChecked() else "copy"
 
         self._worker = SplitWorker(img, lbl, out, t / total, v / total, s / total, mode)
         self._worker.finished.connect(self._on_finished)
@@ -352,7 +344,6 @@ class DatasetSplitPanel(QWidget):
         self.split_btn.setEnabled(True)
 
         if not result["ok"]:
-            # 有缺失 → 警告
             msg = "配对不完整，无法划分：\n\n"
             if result["missing_label"]:
                 msg += f"⚠ 缺少标签的图片 ({len(result['missing_label'])} 张):\n"

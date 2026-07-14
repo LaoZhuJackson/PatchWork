@@ -7,18 +7,14 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
-    QGroupBox,
     QHBoxLayout,
     QVBoxLayout,
     QWidget,
 )
 from qfluentwidgets import (
-    PushButton,
-    LineEdit,
-    ProgressBar,
-    BodyLabel,
-    SubtitleLabel,
-    CheckBox, PrimaryPushButton,
+    PushButton, PrimaryPushButton, LineEdit, ProgressBar,
+    BodyLabel, StrongBodyLabel, SubtitleLabel,
+    CheckBox, CardWidget,
 )
 
 from app.services.exporter import ONNXExporter
@@ -52,6 +48,7 @@ class ExportWorker(Worker):
 
 class ExportONNXPanel(QWidget):
     """导出 ONNX 面板"""
+
     def __init__(self) -> None:
         super().__init__()
         self.setObjectName("export_onnx_panel")
@@ -63,16 +60,16 @@ class ExportONNXPanel(QWidget):
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
-        layout.setContentsMargins(24,24,24,24)
+        layout.setContentsMargins(24, 24, 24, 24)
 
         # ---- 标题 ----
         layout.addWidget(SubtitleLabel("导出 ONNX"))
 
-        # ---- 路径选择 ----
-        path_group = QGroupBox("路径设置")
-        path_form = QFormLayout(path_group)
+        # ---- 路径设置 ----
+        layout.addWidget(StrongBodyLabel("路径设置"))
+        path_card = CardWidget()
+        path_form = QFormLayout(path_card)
 
-        # 模型文件
         model_row = QHBoxLayout()
         self.model_edit = LineEdit()
         self.model_edit.setPlaceholderText("选择 YOLO .pt 模型文件...")
@@ -80,9 +77,8 @@ class ExportONNXPanel(QWidget):
         model_btn.clicked.connect(self._browse_model)
         model_row.addWidget(self.model_edit, 1)
         model_row.addWidget(model_btn)
-        path_form.addRow("模型文件:", model_row)
+        path_form.addRow(BodyLabel("模型文件:"), model_row)
 
-        # 输出目录
         out_row = QHBoxLayout()
         self.out_edit = LineEdit()
         self.out_edit.setPlaceholderText("选择输出目录（留空则保存在模型同级目录）...")
@@ -90,13 +86,14 @@ class ExportONNXPanel(QWidget):
         out_btn.clicked.connect(self._browse_out)
         out_row.addWidget(self.out_edit, 1)
         out_row.addWidget(out_btn)
-        path_form.addRow("输出目录:", out_row)
+        path_form.addRow(BodyLabel("输出目录:"), out_row)
 
-        layout.addWidget(path_group)
+        layout.addWidget(path_card)
 
-        # ---- 选项 ----
-        opt_group = QGroupBox("导出选项")
-        opt_layout = QVBoxLayout(opt_group)
+        # ---- 导出选项 ----
+        layout.addWidget(StrongBodyLabel("导出选项"))
+        opt_card = CardWidget()
+        opt_layout = QVBoxLayout(opt_card)
 
         self.simplify_check = CheckBox("简化模型（simplify，推荐开启）")
         self.simplify_check.setChecked(True)
@@ -112,7 +109,7 @@ class ExportONNXPanel(QWidget):
         )
         opt_layout.addWidget(self.dynamic_check)
 
-        layout.addWidget(opt_group)
+        layout.addWidget(opt_card)
 
         # ---- 执行 ----
         self.export_btn = PrimaryPushButton("开始导出")

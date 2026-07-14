@@ -3,11 +3,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
-    QGroupBox,
     QHBoxLayout,
     QVBoxLayout,
     QWidget,
@@ -15,13 +13,15 @@ from PySide6.QtWidgets import (
 from qfluentwidgets import (
     PushButton,
     LineEdit,
-    SubtitleLabel,
     BodyLabel,
+    StrongBodyLabel,
+    SubtitleLabel,
+    CardWidget,
 )
 
 from app.services.label_reader import IMAGE_EXTS, parse_yolo_label
 from app.utils.config import get_str, set_str
-from app.utils.message import info, warning
+from app.utils.message import info
 from app.widgets.image_browser import ImageBrowser
 
 
@@ -32,7 +32,7 @@ class LabelPreviewPanel(QWidget):
         super().__init__()
         self.setObjectName("label_preview_panel")
 
-        self._label_map: dict[str, Path] = {}   # stem → label 路径
+        self._label_map: dict[str, Path] = {}
 
         self._setup_ui()
         self._load_settings()
@@ -45,11 +45,11 @@ class LabelPreviewPanel(QWidget):
         # ---- 标题 ----
         layout.addWidget(SubtitleLabel("Label 标注预览"))
 
-        # ---- 路径选择 ----
-        path_group = QGroupBox("路径设置")
-        path_form = QFormLayout(path_group)
+        # ---- 路径设置 ----
+        layout.addWidget(StrongBodyLabel("路径设置"))
+        path_card = CardWidget()
+        path_form = QFormLayout(path_card)
 
-        # 图片目录
         img_row = QHBoxLayout()
         self.img_edit = LineEdit()
         self.img_edit.setPlaceholderText("选择图片所在的文件夹...")
@@ -57,9 +57,8 @@ class LabelPreviewPanel(QWidget):
         img_btn.clicked.connect(lambda: self._browse_dir(self.img_edit, "label_preview_img_dir"))
         img_row.addWidget(self.img_edit, 1)
         img_row.addWidget(img_btn)
-        path_form.addRow("图片目录:", img_row)
+        path_form.addRow(BodyLabel("图片目录:"), img_row)
 
-        # 标签目录
         lbl_row = QHBoxLayout()
         self.lbl_edit = LineEdit()
         self.lbl_edit.setPlaceholderText("选择标签所在的文件夹...")
@@ -67,14 +66,14 @@ class LabelPreviewPanel(QWidget):
         lbl_btn.clicked.connect(lambda: self._browse_dir(self.lbl_edit, "label_preview_lbl_dir"))
         lbl_row.addWidget(self.lbl_edit, 1)
         lbl_row.addWidget(lbl_btn)
-        path_form.addRow("标签目录:", lbl_row)
+        path_form.addRow(BodyLabel("标签目录:"), lbl_row)
 
         self.info_label = BodyLabel("")
-        path_form.addRow("", self.info_label)
+        path_form.addRow(BodyLabel(""), self.info_label)
 
-        layout.addWidget(path_group)
+        layout.addWidget(path_card)
 
-        # ---- 图片浏览器（缩略图 + Viewer + 导航按钮） ----
+        # ---- 图片浏览器 ----
         self.browser = ImageBrowser()
         self.browser.image_selected.connect(self._on_image_selected)
         layout.addWidget(self.browser, 1)
@@ -90,7 +89,6 @@ class LabelPreviewPanel(QWidget):
         self._reload()
 
     def _reload(self) -> None:
-        """根据当前两个路径重新加载"""
         img_dir = self.img_edit.text().strip()
         lbl_dir = self.lbl_edit.text().strip()
 
@@ -103,7 +101,6 @@ class LabelPreviewPanel(QWidget):
         self._load_dataset(img_path, lbl_path if lbl_path and lbl_path.is_dir() else None)
 
     def _load_dataset(self, img_dir: Path, lbl_dir: Path | None) -> None:
-        """加载并对接 images 和 labels"""
         self._label_map.clear()
 
         images = sorted(
@@ -115,7 +112,6 @@ class LabelPreviewPanel(QWidget):
             self.browser.clear()
             return
 
-        # 配对
         missing_label: list[str] = []
         if lbl_dir:
             for img in images:
@@ -125,7 +121,6 @@ class LabelPreviewPanel(QWidget):
                 else:
                     missing_label.append(img.name)
 
-        # 汇总信息
         paired = len(self._label_map)
         msg = f"共 {len(images)} 张图片，{paired} 张已配对"
         if missing_label:
@@ -141,13 +136,11 @@ class LabelPreviewPanel(QWidget):
             info("配对提示", detail, self)
         self.info_label.setText(msg)
 
-        # 加载浏览器，自动选中第一张
         self.browser.set_images(images, select_index=0)
 
     # ---- 图片选中 ----
 
     def _on_image_selected(self, idx: int, path: Path) -> None:
-        """缩略图点击或导航按钮 → 叠加 label 标注"""
         pixmap = self.browser.current_pixmap
         if pixmap is None or pixmap.isNull():
             return

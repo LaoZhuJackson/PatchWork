@@ -4,8 +4,10 @@ from __future__ import annotations
 import sys
 
 from PySide6.QtWidgets import QApplication
+from qfluentwidgets import setTheme, Theme
 
 from app.main_window import MainWindow
+from app.utils.config import get_str
 from app.utils.logger import setup_logging
 from app.utils.message import error, warning
 
@@ -13,6 +15,10 @@ from app.utils.message import error, warning
 def main() -> None:
     app = QApplication(sys.argv)
     app.setApplicationName("PatchWork")
+
+    # 恢复主题
+    saved = get_str("app_theme", "light")
+    setTheme(Theme.DARK if saved == "dark" else Theme.LIGHT)
 
     # 初始化日志
     qt_handler = setup_logging()

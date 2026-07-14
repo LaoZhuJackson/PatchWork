@@ -1,10 +1,11 @@
 """主窗口：FluentWindow 侧边栏导航 + 页面切换"""
 from __future__ import annotations
 
-from qfluentwidgets import FluentWindow, NavigationItemPosition
+from qfluentwidgets import FluentWindow, NavigationItemPosition, setTheme, Theme
 from qfluentwidgets import FluentIcon as FIF
 from PySide6.QtWidgets import QLabel
 
+from app.utils.config import get_str, set_str
 from app.widgets.dataset_split import DatasetSplitPanel
 from app.widgets.export_onnx import ExportONNXPanel
 from app.widgets.label_preview import LabelPreviewPanel
@@ -78,3 +79,20 @@ class MainWindow(FluentWindow):
             FIF.LINK, "X-AnyLabeling",
             position=NavigationItemPosition.BOTTOM,
         )
+        # 主题切换按钮（不切换页面，仅触发回调）
+        icon = FIF.CONSTRACT
+        self.navigationInterface.addItem(
+            routeKey="theme_toggle",
+            icon=icon,
+            text="切换主题",
+            onClick=self._toggle_theme,
+            selectable=False,
+            position=NavigationItemPosition.BOTTOM,
+        )
+
+    def _toggle_theme(self) -> None:
+        """切换浅色/深色主题"""
+        current = get_str("app_theme", "light")
+        new = "dark" if current == "light" else "light"
+        set_str("app_theme", new)
+        setTheme(Theme.DARK if new == "dark" else Theme.LIGHT)
