@@ -7,7 +7,8 @@ SETTINGS = QSettings("PatchWork", "PatchWork")
 
 
 def _get(key: str, default: Any = "") -> Any:
-    return SETTINGS.value(key, default)
+    val = SETTINGS.value(key, default)
+    return val if val is not None else default
 
 
 def get_str(key: str, default: str = "") -> str:

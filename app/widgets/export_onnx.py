@@ -18,7 +18,7 @@ from qfluentwidgets import (
     ProgressBar,
     BodyLabel,
     SubtitleLabel,
-    CheckBox,
+    CheckBox, PrimaryPushButton,
 )
 
 from app.services.exporter import ONNXExporter
@@ -115,7 +115,7 @@ class ExportONNXPanel(QWidget):
         layout.addWidget(opt_group)
 
         # ---- 执行 ----
-        self.export_btn = PushButton("开始导出")
+        self.export_btn = PrimaryPushButton("开始导出")
         self.export_btn.clicked.connect(self._on_export)
         layout.addWidget(self.export_btn, alignment=Qt.AlignmentFlag.AlignRight)
 

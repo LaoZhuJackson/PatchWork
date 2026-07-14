@@ -77,6 +77,8 @@ class ModelInferPanel(QWidget):
         self._load_worker: LoadModelWorker | None = None
         self._infer_worker: InferWorker | None = None
 
+        self._inferring: bool = False
+
         self._setup_ui()
         self._load_settings()
 
@@ -236,7 +238,7 @@ class ModelInferPanel(QWidget):
         if 0 <= self._current_index < len(self._image_files):
             self._run_inference(self._current_index)
 
-    def _on_model_error(self, err:str) -> None:
+    def _on_model_error(self, err: str) -> None:
         self.status_label.setText("❌ 模型加载失败")
         error("模型加载失败", err, self)
 
@@ -298,12 +300,19 @@ class ModelInferPanel(QWidget):
     def _run_inference(self, idx: int) -> None:
         if not self._engine.is_loaded:
             return
-        if idx <0 or idx >= len(self._image_files):
+        if idx < 0 or idx >= len(self._image_files):
             return
+        # 如果正在推理，先终止旧线程
+        if self._inferring and self._infer_worker and self._infer_worker.isRunning():
+            self._infer_worker.quit()
+            self._infer_worker.wait(1000)
 
+        self._inferring = True
         self._current_index = idx
         self._update_nav_buttons()
         self.image_list.setCurrentRow(idx)
+
+        self.image_list.setEnabled(False) # 禁止推理期间的操作
 
         img_path = self._image_files[idx]
         self.status_label.setText(f"正在推理: {img_path.name} ...")
@@ -333,9 +342,15 @@ class ModelInferPanel(QWidget):
             f"{img_path.name} | 检测到 {len(annotations)} 个目标"
         )
 
+        self._inferring = False
+        self.image_list.setEnabled(True)
+
     def _on_infer_error(self, err: str) -> None:
         self.status_label.setText("❌ 推理失败")
         error("推理失败", err, self)
+
+        self._inferring = False
+        self.image_list.setEnabled(True)
 
     # ---- 导航 ----
 
@@ -353,8 +368,9 @@ class ModelInferPanel(QWidget):
 
     def _update_nav_buttons(self) -> None:
         total = len(self._image_files)
-        self.prev_btn.setEnabled(self._current_index > 0)
-        self.next_btn.setEnabled(self._current_index < total - 1)
+        disabled = self._inferring or not self._engine.is_loaded
+        self.prev_btn.setEnabled(not disabled and self._current_index > 0)
+        self.next_btn.setEnabled(not disabled and self._current_index < total - 1)
 
     # ---- 持久化 ----
 

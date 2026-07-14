@@ -11,7 +11,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from qfluentwidgets import PushButton, LineEdit, ProgressBar, BodyLabel, SubtitleLabel, Slider, CheckBox
+from qfluentwidgets import PushButton, LineEdit, ProgressBar, BodyLabel, SubtitleLabel, Slider, CheckBox, \
+    PrimaryPushButton
 
 from app.services.splitter import split_dataset, IMAGE_EXTS, find_pairs
 from app.utils.config import get_str, set_str, set_bool, set_int, get_int, get_bool
@@ -154,7 +155,7 @@ class DatasetSplitPanel(QWidget):
         self.check_btn.clicked.connect(self._on_check_detail)
         bottom_row.addWidget(self.check_btn)
 
-        self.split_btn = PushButton("开始划分")
+        self.split_btn = PrimaryPushButton("开始划分")
         self.split_btn.clicked.connect(self._on_split)
         bottom_row.addWidget(self.split_btn)
 

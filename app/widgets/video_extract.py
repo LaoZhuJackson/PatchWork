@@ -21,13 +21,17 @@ from qfluentwidgets import (
     ProgressBar,
     BodyLabel,
     SubtitleLabel,
-    DoubleSpinBox, ComboBox,
+    DoubleSpinBox, ComboBox, PrimaryPushButton,
 )
 
 from app.services.video_extractor import extract_frames
 from app.utils.config import get_str, set_str, get_float, set_float, get_int, set_int
 from app.utils.message import info, warning, error
 from app.utils.worker import Worker
+
+from app.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class ExtractWorker(Worker):
@@ -117,7 +121,7 @@ class VideoExtractPanel(QWidget):
         self._mode_group = QButtonGroup(self)
         self._mode_group.addButton(self.time_radio, 0)
         self._mode_group.addButton(self.frame_radio, 1)
-        self._mode_group.buttonClicked.connect(self._on_mode_changed)
+        self._mode_group.buttonClicked.connect(self._on_interval_changed)
         mode_row.addWidget(self.time_radio)
         mode_row.addWidget(self.frame_radio)
         mode_row.addStretch()
@@ -144,7 +148,7 @@ class VideoExtractPanel(QWidget):
         self.fmt_combo = ComboBox()
         self.fmt_combo.addItems(["jpg", "png"])
         self.fmt_combo.currentTextChanged.connect(
-            lambda v: set_str("extract_format", v)
+            lambda v: (set_str("extract_format", v), self._update_estimate())
         )
         fmt_row.addWidget(self.fmt_combo)
         fmt_row.addStretch()
@@ -157,9 +161,9 @@ class VideoExtractPanel(QWidget):
         layout.addWidget(mode_group)
 
         # ---- 执行 ----
-        self.extract_btn = PushButton("开始抽帧")
+        self.extract_btn = PrimaryPushButton("开始抽帧")
         self.extract_btn.clicked.connect(self._on_extract)
-        layout.addWidget(self.extract_btn, alignment=Qt.AlignmentFlag.AlignLeft)
+        layout.addWidget(self.extract_btn, alignment=Qt.AlignmentFlag.AlignRight)
 
         self.status_label = BodyLabel("")
         layout.addWidget(self.status_label)
@@ -174,6 +178,7 @@ class VideoExtractPanel(QWidget):
 
     def _update_estimate(self) -> None:
         """根据视频信息和抽帧设置更新预估产出"""
+        logger.info(f"调用 _update_estimate: total={self._video_total}, fps={self._video_fps}")
         if self._video_total <= 0 or self._video_fps <= 0:
             self.estimate_label.setText("")
             return
@@ -223,18 +228,7 @@ class VideoExtractPanel(QWidget):
         set_str("extract_video_path", path)
 
         # 自动读取视频信息
-        import cv2
-        cap = cv2.VideoCapture(path)
-        if cap.isOpened():
-            total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-            duration = total / fps if fps > 0 else 0
-            self.video_info.setText(
-                f"总帧数: {total}  |  FPS: {fps:.1f}  |  时长: {duration:.1f}s"
-            )
-            cap.release()
-        else:
-            self.video_info.setText("⚠ 无法读取视频信息")
+        self._load_video(path)
 
     def _browse_out(self) -> None:
         path = QFileDialog.getExistingDirectory(
@@ -243,6 +237,25 @@ class VideoExtractPanel(QWidget):
         if path:
             self.out_edit.setText(path)
             set_str("extract_output_dir", path)
+
+    def _load_video(self, path: str):
+        if not path:
+            return
+        import cv2
+        cap = cv2.VideoCapture(path)
+        if cap.isOpened():
+            self._video_total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            self._video_fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+            duration = self._video_total / self._video_fps if self._video_fps > 0 else 0
+            self.video_info.setText(
+                f"总帧数: {self._video_total}  |  FPS: {self._video_fps:.1f}  |  时长: {duration:.1f}s"
+            )
+            cap.release()
+        else:
+            self.video_info.setText("⚠ 无法读取视频信息")
+            self._video_total = 0
+            self._video_fps = 0.0
+        self._update_estimate()
 
     def _on_mode_changed(self) -> None:
         mode = "frame" if self._mode_group.checkedId() == 1 else "time"
@@ -267,7 +280,7 @@ class VideoExtractPanel(QWidget):
         self.interval_spin.blockSignals(False)
         self._update_estimate()
 
-    def _on_interval_changed(self, value:float) -> None:
+    def _on_interval_changed(self, value: float) -> None:
         """仅值变化时触发：保存 + 更新预估"""
         mode = "frame" if self._mode_group.checkedId() == 1 else "time"
         if mode == "time":
@@ -332,7 +345,10 @@ class VideoExtractPanel(QWidget):
     # ---- 持久化 ----
 
     def _load_settings(self) -> None:
-        self.video_edit.setText(get_str("extract_video_path"))
+        path = get_str("extract_video_path")
+        self.video_edit.setText(path)
+        self._load_video(path)
+
         self.out_edit.setText(get_str("extract_output_dir"))
 
         # 格式
