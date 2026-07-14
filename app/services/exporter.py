@@ -7,6 +7,9 @@ from typing import Callable
 
 from ultralytics import YOLO
 
+from app.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 class ONNXExporter:
     """YOLO → ONNX 导出器"""
@@ -20,11 +23,12 @@ class ONNXExporter:
         """导出 ONNX 模型（在后台线程中调用）"""
         self._model = YOLO(str(model_path))
 
-        if imgsz is None:
-            overrides = self._model.overrides
-            imgsz = overrides.get("imgsz", 640)
-            if isinstance(imgsz, (list, tuple)):
-                imgsz = imgsz[0]
+        overrides = self._model.overrides
+        i = overrides.get("imgsz", 640)
+        if isinstance(imgsz, (list, tuple)):
+            i = imgsz[0]
+        logger.info(f"模型中获取到的imgsz: {i}")
+
         # 如果指定了输出目录，先 cd 进去（ultralytics export 输出到 CWD）
         cwd = os.getcwd()
         try:

@@ -14,11 +14,11 @@ from PySide6.QtWidgets import (
 from qfluentwidgets import (
     PushButton, PrimaryPushButton, LineEdit, ProgressBar,
     BodyLabel, StrongBodyLabel, SubtitleLabel,
-    CheckBox, CardWidget,
+    CheckBox, CardWidget, SpinBox,
 )
 
 from app.services.exporter import ONNXExporter
-from app.utils.config import get_str, set_str, get_bool, set_bool
+from app.utils.config import get_str, set_str, get_bool, set_bool, set_int
 from app.utils.message import info, error
 from app.utils.worker import Worker
 
@@ -95,6 +95,20 @@ class ExportONNXPanel(QWidget):
         opt_card = CardWidget()
         opt_layout = QVBoxLayout(opt_card)
 
+        imgsz_row = QHBoxLayout()
+        imgsz_row.addWidget(BodyLabel("输入尺寸 (imgsz):"))
+        self.imgsz_spin = SpinBox()
+        self.imgsz_spin.setRange(32, 4096)
+        self.imgsz_spin.setSingleStep(32)
+        self.imgsz_spin.setValue(640)
+        self.imgsz_spin.setToolTip("模型的输入尺寸，与训练时保持一致")
+        self.imgsz_spin.valueChanged.connect(
+            lambda v: set_int("onnx_imgsz", v)
+        )
+        imgsz_row.addWidget(self.imgsz_spin)
+        imgsz_row.addStretch()
+        opt_layout.addLayout(imgsz_row)
+
         self.simplify_check = CheckBox("简化模型（simplify，推荐开启）")
         self.simplify_check.setChecked(True)
         self.simplify_check.stateChanged.connect(
@@ -152,13 +166,14 @@ class ExportONNXPanel(QWidget):
         out = self.out_edit.text().strip()
         simplify = self.simplify_check.isChecked()
         dynamic = self.dynamic_check.isChecked()
+        imgsz = self.imgsz_spin.value()
 
         self.export_btn.setEnabled(False)
         self.progress.setVisible(True)
         self.progress.setValue(0)
         self.status_label.setText("正在导出...")
 
-        self._worker = ExportWorker(model, out, 640, simplify, dynamic)
+        self._worker = ExportWorker(model, out, imgsz, simplify, dynamic)
         self._worker.finished.connect(self._on_finished)
         self._worker.error.connect(self._on_error)
         self._worker.progress.connect(self.progress.setValue)
