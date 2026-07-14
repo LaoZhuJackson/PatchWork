@@ -98,10 +98,10 @@ class ExportONNXPanel(QWidget):
         imgsz_row = QHBoxLayout()
         imgsz_row.addWidget(BodyLabel("输入尺寸 (imgsz):"))
         self.imgsz_spin = SpinBox()
-        self.imgsz_spin.setRange(32, 4096)
+        self.imgsz_spin.setRange(0, 4096)
         self.imgsz_spin.setSingleStep(32)
         self.imgsz_spin.setValue(640)
-        self.imgsz_spin.setToolTip("模型的输入尺寸，与训练时保持一致")
+        self.imgsz_spin.setToolTip("模型的输入尺寸，与训练时保持一致，设0为自动获取")
         self.imgsz_spin.valueChanged.connect(
             lambda v: set_int("onnx_imgsz", v)
         )

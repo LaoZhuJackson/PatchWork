@@ -28,6 +28,8 @@ class ONNXExporter:
         if isinstance(imgsz, (list, tuple)):
             i = imgsz[0]
         logger.info(f"模型中获取到的imgsz: {i}")
+        if imgsz == 0:
+            imgsz = i
 
         # 如果指定了输出目录，先 cd 进去（ultralytics export 输出到 CWD）
         cwd = os.getcwd()
