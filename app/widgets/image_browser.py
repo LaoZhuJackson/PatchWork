@@ -174,6 +174,11 @@ class ImageBrowser(QWidget):
         self.prev_btn.setEnabled(self._current_index > 0)
         self.next_btn.setEnabled(self._current_index < total - 1)
 
+    def set_nav_enabled(self, enabled: bool) -> None:
+        """推理中禁用列表和导航按钮"""
+        self.prev_btn.setEnabled(enabled and self._current_index > 0)
+        self.next_btn.setEnabled(enabled and self._current_index < self.thumb_list.count - 1)
+
     # ---- 按钮定位 ----
 
     def resizeEvent(self, event) -> None:

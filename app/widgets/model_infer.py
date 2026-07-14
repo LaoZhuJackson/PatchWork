@@ -46,6 +46,7 @@ class InferWorker(Worker):
 
     def __init__(self, engine: InferenceEngine, image_path: Path, conf: float, iou: float) -> None:
         super().__init__()
+        self.setTerminationEnabled(True)
         self.engine = engine
         self.image_path = image_path
         self.conf = conf
@@ -244,8 +245,8 @@ class ModelInferPanel(QWidget):
 
         # 正在推理则终止旧线程
         if self._inferring and self._infer_worker and self._infer_worker.isRunning():
-            self._infer_worker.quit()
-            self._infer_worker.wait(1000)
+            self._infer_worker.terminate()
+            self._infer_worker.wait(3000)
 
         self._inferring = True
         self._update_ui_state()
@@ -277,6 +278,7 @@ class ModelInferPanel(QWidget):
     def _update_ui_state(self) -> None:
         """推理中禁用图片列表"""
         self.browser.thumb_list.setDisabled(self._inferring)
+        self.browser.set_nav_enabled(not self._inferring)
 
     def _on_reinfer(self) -> None:
         """手动触发重新推理"""
