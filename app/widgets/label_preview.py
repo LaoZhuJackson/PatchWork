@@ -3,33 +3,26 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QPixmap
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
-    QListWidget,
-    QListWidgetItem,
-    QMessageBox,
     QVBoxLayout,
-    QWidget, QPushButton,
+    QWidget,
 )
 from qfluentwidgets import (
     PushButton,
     LineEdit,
     SubtitleLabel,
     BodyLabel,
-    FluentIcon as FIF,
 )
 
 from app.services.label_reader import IMAGE_EXTS, parse_yolo_label
 from app.utils.config import get_str, set_str
 from app.utils.message import info, warning
-from app.widgets.image_viewer import ImageViewer
-
-THUMB_SIZE = QSize(100, 80)
+from app.widgets.image_browser import ImageBrowser
 
 
 class LabelPreviewPanel(QWidget):
@@ -39,9 +32,7 @@ class LabelPreviewPanel(QWidget):
         super().__init__()
         self.setObjectName("label_preview_panel")
 
-        self._image_files: list[Path] = []  # 所有图片
-        self._label_map: dict[str, Path] = {}  # stem → label 路径
-        self._current_index: int = -1
+        self._label_map: dict[str, Path] = {}   # stem → label 路径
 
         self._setup_ui()
         self._load_settings()
@@ -63,7 +54,7 @@ class LabelPreviewPanel(QWidget):
         self.img_edit = LineEdit()
         self.img_edit.setPlaceholderText("选择图片所在的文件夹...")
         img_btn = PushButton("浏览...")
-        img_btn.clicked.connect(lambda: self._browse_dir(self.img_edit, "label_preview_img_dir", self._on_path_changed))
+        img_btn.clicked.connect(lambda: self._browse_dir(self.img_edit, "label_preview_img_dir"))
         img_row.addWidget(self.img_edit, 1)
         img_row.addWidget(img_btn)
         path_form.addRow("图片目录:", img_row)
@@ -73,7 +64,7 @@ class LabelPreviewPanel(QWidget):
         self.lbl_edit = LineEdit()
         self.lbl_edit.setPlaceholderText("选择标签所在的文件夹...")
         lbl_btn = PushButton("浏览...")
-        lbl_btn.clicked.connect(lambda: self._browse_dir(self.lbl_edit, "label_preview_lbl_dir", self._on_path_changed))
+        lbl_btn.clicked.connect(lambda: self._browse_dir(self.lbl_edit, "label_preview_lbl_dir"))
         lbl_row.addWidget(self.lbl_edit, 1)
         lbl_row.addWidget(lbl_btn)
         path_form.addRow("标签目录:", lbl_row)
@@ -83,99 +74,37 @@ class LabelPreviewPanel(QWidget):
 
         layout.addWidget(path_group)
 
-        # ---- 上方: 水平缩略图列表 ----
-        layout.addWidget(BodyLabel("图片列表:"))
-
-        self.image_list = QListWidget()
-        self.image_list.setFlow(QListWidget.Flow.LeftToRight)
-        self.image_list.setViewMode(QListWidget.ViewMode.IconMode)
-        self.image_list.setIconSize(THUMB_SIZE)
-        self.image_list.setGridSize(QSize(THUMB_SIZE.width() + 12, THUMB_SIZE.height() + 30))
-        self.image_list.setResizeMode(QListWidget.ResizeMode.Adjust)
-        self.image_list.setWrapping(False)
-        self.image_list.setHorizontalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
-        self.image_list.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.image_list.setFixedHeight(THUMB_SIZE.height() + 40)
-        self.image_list.itemClicked.connect(self._on_item_clicked)
-        self.image_list.wheelEvent = self._list_wheel_event # 替换滚轮逻辑
-        layout.addWidget(self.image_list)
-
-        # ---- 下方: 导航 + 预览 ----
-        preview_container = QWidget()
-        preview_container.setMinimumHeight(300)
-        container_layout = QHBoxLayout(preview_container)
-        container_layout.setContentsMargins(0,0,0,0)
-
-        self.viewer = ImageViewer()
-        container_layout.addWidget(self.viewer)
-
-        # 叠加在 viewer 上的圆形按钮样式
-        btn_style = """
-            QPushButton {
-              background: rgba(0, 0, 0, 0.35);
-              color: white;
-              border: none;
-              border-radius: 24px;
-              font-size: 20px;
-              min-width: 48px;
-              max-width: 48px;
-              min-height: 48px;
-              max-height: 48px;
-            }
-            QPushButton:hover {
-              background: rgba(0, 0, 0, 0.65);
-            }
-        """
-        self.prev_btn = QPushButton("◀")
-        self.prev_btn.setToolTip("上一张")
-        self.prev_btn.setStyleSheet(btn_style)
-        self.prev_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.prev_btn.setParent(self.viewer)
-        self.prev_btn.clicked.connect(self._prev_image)
-        self.prev_btn.move(12, 0) # y 在 resizeEvent 里居中
-
-        self.next_btn = QPushButton("▶")
-        self.next_btn.setToolTip("下一张")
-        self.next_btn.setStyleSheet(btn_style)
-        self.next_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.next_btn.setParent(self.viewer)
-        self.next_btn.clicked.connect(self._next_image)
-        self.next_btn.move(0, 0)
-
-        layout.addWidget(preview_container, 1)
+        # ---- 图片浏览器（缩略图 + Viewer + 导航按钮） ----
+        self.browser = ImageBrowser()
+        self.browser.image_selected.connect(self._on_image_selected)
+        layout.addWidget(self.browser, 1)
 
     # ---- 路径 ----
 
-    def _browse_dir(self, edit: LineEdit, key: str, callback=None) -> None:
+    def _browse_dir(self, edit: LineEdit, key: str) -> None:
         path = QFileDialog.getExistingDirectory(self, "选择目录", edit.text())
         if not path:
             return
         edit.setText(path)
         set_str(key, path)
-        if callback:
-            callback()
+        self._reload()
 
-    def _on_path_changed(self) -> None:
-        """任一目录变更时重新加载"""
+    def _reload(self) -> None:
+        """根据当前两个路径重新加载"""
         img_dir = self.img_edit.text().strip()
         lbl_dir = self.lbl_edit.text().strip()
-        if img_dir and lbl_dir:
-            self._load_dataset(Path(img_dir), Path(lbl_dir))
-        elif img_dir:
-            # 仅图片目录，无标签
-            self._load_dataset(Path(img_dir), None)
+
+        img_path = Path(img_dir) if img_dir else None
+        lbl_path = Path(lbl_dir) if lbl_dir else None
+
+        if img_path is None or not img_path.is_dir():
+            return
+
+        self._load_dataset(img_path, lbl_path if lbl_path and lbl_path.is_dir() else None)
 
     def _load_dataset(self, img_dir: Path, lbl_dir: Path | None) -> None:
-        """加载数据集，配对 images/ 和 labels/"""
-        self._image_files.clear()
+        """加载并对接 images 和 labels"""
         self._label_map.clear()
-        self.image_list.clear()
-        self.viewer.set_image(None)
-        self._current_index = -1
-        self._update_nav_buttons()
-
-        if not img_dir.is_dir():
-            return
 
         images = sorted(
             f for f in img_dir.iterdir() if f.suffix.lower() in IMAGE_EXTS
@@ -183,29 +112,18 @@ class LabelPreviewPanel(QWidget):
 
         if not images:
             self.info_label.setText("❌ 图片目录下未找到图片")
+            self.browser.clear()
             return
-
-        self._image_files = images
 
         # 配对
         missing_label: list[str] = []
-        if lbl_dir and lbl_dir.is_dir():
+        if lbl_dir:
             for img in images:
                 label = lbl_dir / f"{img.stem}.txt"
                 if label.exists():
                     self._label_map[img.stem] = label
                 else:
                     missing_label.append(img.name)
-        # 缩略图列表
-        for img in images:
-            icon = QPixmap(str(img)).scaled(
-                THUMB_SIZE, Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            )
-            item = QListWidgetItem(icon, img.name)
-            item.setData(Qt.ItemDataRole.UserRole, str(img))
-            item.setToolTip(img.name)
-            self.image_list.addItem(item)
 
         # 汇总信息
         paired = len(self._label_map)
@@ -223,91 +141,31 @@ class LabelPreviewPanel(QWidget):
             info("配对提示", detail, self)
         self.info_label.setText(msg)
 
-        # 选中第一张
-        if self._image_files:
-            self.image_list.setCurrentRow(0)
-            self._show_image_at(0)
+        # 加载浏览器，自动选中第一张
+        self.browser.set_images(images, select_index=0)
 
-    # ---- 导航 ----
-    def _prev_image(self) -> None:
-        if not self._image_files:
-            return
-        new_idx = max(0, self._current_index - 1)
-        self.image_list.setCurrentRow(new_idx)
-        self._show_image_at(new_idx)
+    # ---- 图片选中 ----
 
-    def _next_image(self) -> None:
-        if not self._image_files:
-            return
-        new_idx = min(len(self._image_files) - 1, self._current_index + 1)
-        self.image_list.setCurrentRow(new_idx)
-        self._show_image_at(new_idx)
-
-    def _on_item_clicked(self, item: QListWidgetItem) -> None:
-        idx = self.image_list.row(item)
-        self._show_image_at(idx)
-
-    def _show_image_at(self, idx: int) -> None:
-        if idx < 0 or idx >= len(self._image_files):
-            return
-        self._current_index = idx
-        self._update_nav_buttons()
-
-        img_path = self._image_files[idx]
-        if not img_path.exists():
-            return
-        pixmap = QPixmap(str(img_path))
-        if pixmap.isNull():
-            warning("错误", f"无法加载图片: {img_path.name}", self)
+    def _on_image_selected(self, idx: int, path: Path) -> None:
+        """缩略图点击或导航按钮 → 叠加 label 标注"""
+        pixmap = self.browser.current_pixmap
+        if pixmap is None or pixmap.isNull():
             return
 
-        # 查找对应label文件
-        label_path = self._label_map.get(img_path.stem)
+        label_path = self._label_map.get(path.stem)
         if label_path:
             annotations = parse_yolo_label(label_path, pixmap.width(), pixmap.height())
         else:
             annotations = []
-        self.viewer.set_image(pixmap)
-        for ann in annotations:
-            if ann["type"] == "bbox":
-                self.viewer.add_bbox(ann["rect"], ann["color"], ann["label"])
-            elif ann["type"] == "polygon":
-                self.viewer.add_polygon(ann["points"], ann["color"], ann["label"])
 
-    def _update_nav_buttons(self) -> None:
-        total = len(self._image_files)
-        self.prev_btn.setEnabled(self._current_index > 0)
-        self.next_btn.setEnabled(self._current_index < total - 1)
-
-    def resizeEvent(self, event) -> None:
-        super().resizeEvent(event)
-        self._position_nav_buttons()
-
-    def showEvent(self, event) -> None:
-        super().showEvent(event)
-        from PySide6.QtCore import QTimer
-        QTimer.singleShot(50, self._position_nav_buttons)
-
-    def _position_nav_buttons(self):
-        """将导航按钮放在 viewer 左右两侧垂直居中"""
-        vw = self.viewer.width()
-        vh = self.viewer.height()
-        btn_h = 48
-        center_y = (vh - btn_h) // 2
-        self.prev_btn.move(12, center_y)
-        self.next_btn.move(vw - 60, center_y)
-
-    def _list_wheel_event(self, event) -> None:
-        """将垂直滚轮转为水平滚动"""
-        delta = event.angleDelta().y()
-        bar = self.image_list.horizontalScrollBar()
-        bar.setValue(bar.value() - delta)
+        self.browser.show_annotations(annotations)
 
     # ---- 持久化 ----
+
     def _load_settings(self) -> None:
         self.img_edit.setText(get_str("label_preview_img_dir"))
         self.lbl_edit.setText(get_str("label_preview_lbl_dir"))
-        # 恢复上次的两个路径
+
         img_dir = get_str("label_preview_img_dir")
         lbl_dir = get_str("label_preview_lbl_dir")
         if img_dir:
