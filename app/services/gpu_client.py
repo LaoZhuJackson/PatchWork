@@ -180,6 +180,7 @@ def fetch_via_gpustat(
     password: str = "",
     key_path: str = "",
     gpustat_cmd: str = "gpustat --json",
+    conda_path: str = "",
     conda_env: str = "",
     timeout: int = 10,
 ) -> list[GPUInfo]:
@@ -189,12 +190,15 @@ def fetch_via_gpustat(
         conda_env: 可选，conda 环境名。不为空时自动拼接激活命令。
     """
     # 拼接 conda 激活前缀
-    if conda_env:
-        cmd = (
-            f"source ~/.bashrc 2>/dev/null; "
-            f"conda activate {conda_env} 2>/dev/null; "
-            f"{gpustat_cmd}"
-        )
+    if conda_path and conda_env:
+        if "/" in conda_env or "\\" in conda_env:
+            # 完整路径 → --prefix
+            cmd = f"{conda_path} run --prefix {conda_env} {gpustat_cmd}"
+        else:
+            # 环境名 → -n
+            cmd = f"{conda_path} run -n {conda_env} {gpustat_cmd}"
+    elif conda_path:
+        cmd = f"{conda_path} run {gpustat_cmd}"
     else:
         cmd = gpustat_cmd
 

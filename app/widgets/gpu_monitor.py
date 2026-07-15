@@ -52,7 +52,7 @@ class NvidiaSmiWorker(Worker):
 
 
 class GpustatWorker(Worker):
-    def __init__(self, host, port, username, password, key_path, gpustat_cmd, conda_env):
+    def __init__(self, host, port, username, password, key_path, gpustat_cmd, conda_path, conda_env):
         super().__init__()
         self.host = host
         self.port = port
@@ -60,6 +60,7 @@ class GpustatWorker(Worker):
         self.password = password
         self.key_path = key_path
         self.gpustat_cmd = gpustat_cmd
+        self.conda_path = conda_path
         self.conda_env = conda_env
 
     def do_work(self) -> list[GPUInfo]:
@@ -67,6 +68,7 @@ class GpustatWorker(Worker):
             self.host, self.port, self.username,
             self.password, self.key_path,
             gpustat_cmd=self.gpustat_cmd,
+            conda_path=self.conda_path,
             conda_env=self.conda_env,
         )
 
@@ -170,17 +172,25 @@ class GPUMonitorPanel(QWidget):
         self.nvsmi_cmd_label = BodyLabel("nvidia-smi 命令:")
         ssh_form.addRow(self.nvsmi_cmd_label, self.nvsmi_cmd_edit)
 
-        self.gpustat_cmd_edit = LineEdit()
-        self.gpustat_cmd_edit.setPlaceholderText("gpustat --json")
-        self.gpustat_cmd_edit.textChanged.connect(lambda v: set_str("gpu_gpustat_cmd", v))
-        self.gpustat_cmd_label = BodyLabel("gpustat 命令:")
-        ssh_form.addRow(self.gpustat_cmd_label, self.gpustat_cmd_edit)
-
+        # Conda 路径
+        self.conda_path_edit = LineEdit()
+        self.conda_path_edit.setPlaceholderText("/opt/anaconda3/bin/conda")
+        self.conda_path_edit.textChanged.connect(lambda v: set_str("gpu_conda_path", v))
+        self.conda_path_label = BodyLabel("Conda 路径:")
+        ssh_form.addRow(self.conda_path_label, self.conda_path_edit)
+        
         self.conda_env_edit = LineEdit()
         self.conda_env_edit.setPlaceholderText("例如: yolo_env")
         self.conda_env_edit.textChanged.connect(lambda v: set_str("gpu_conda_env", v))
         self.conda_env_label = BodyLabel("Conda 环境:")
         ssh_form.addRow(self.conda_env_label, self.conda_env_edit)
+        
+        self.gpustat_cmd_edit = LineEdit()
+        self.gpustat_cmd_edit.setPlaceholderText("gpustat --json")
+        self.gpustat_cmd_edit.textChanged.connect(lambda v: set_str("gpu_gpustat_cmd", v))
+        self.gpustat_cmd_label = BodyLabel("gpustat 命令:")
+        ssh_form.addRow(self.gpustat_cmd_label, self.gpustat_cmd_edit)
+        
 
         layout.addWidget(self.ssh_card)
 
@@ -249,6 +259,8 @@ class GPUMonitorPanel(QWidget):
         # gpustat 专属
         self.gpustat_cmd_label.setVisible(is_gpustat)
         self.gpustat_cmd_edit.setVisible(is_gpustat)
+        self.conda_path_label.setVisible(is_gpustat)
+        self.conda_path_edit.setVisible(is_gpustat)
         self.conda_env_label.setVisible(is_gpustat)
         self.conda_env_edit.setVisible(is_gpustat)
 
@@ -298,9 +310,10 @@ class GPUMonitorPanel(QWidget):
             else:  # gpustat
                 gpustat_cmd = self.gpustat_cmd_edit.text().strip() or "gpustat --json"
                 conda_env = self.conda_env_edit.text().strip()
+                conda_path = self.conda_path_edit.text().strip()
                 self._worker = GpustatWorker(
                     host, self.port_spin.value(), username,
-                    self._session_password, key_path, gpustat_cmd, conda_env,
+                    self._session_password, key_path, gpustat_cmd, conda_path, conda_env,
                 )
 
         else:  # http
@@ -405,6 +418,7 @@ class GPUMonitorPanel(QWidget):
 
         # gpustat
         self.gpustat_cmd_edit.setText(get_str("gpu_gpustat_cmd", ""))
+        self.conda_path_edit.setText(get_str("gpu_conda_path", ""))
         self.conda_env_edit.setText(get_str("gpu_conda_env", ""))
 
         # HTTP
