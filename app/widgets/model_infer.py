@@ -208,6 +208,9 @@ class ModelInferPanel(QWidget):
         self._load_images(Path(path))
 
     def _load_images(self, directory: Path) -> None:
+        # 切换文件夹的时候取消推理
+        self._cancel_inference()
+
         images = sorted(
             f for f in directory.iterdir() if f.suffix.lower() in IMAGE_EXTS
         )
@@ -223,10 +226,6 @@ class ModelInferPanel(QWidget):
         self.status_label.setText(f"共 {len(images)} 张图片 | 模型: {model_status}")
 
         self.browser.set_images(images, select_index=0)
-
-        # 自动推理第一张
-        if self._engine.is_loaded:
-            self._run_inference()
 
     # ---- 推理 ----
 
@@ -284,6 +283,14 @@ class ModelInferPanel(QWidget):
         """手动触发重新推理"""
         if self._engine.is_loaded and self.browser.current_path is not None:
             self._run_inference()
+
+    def _cancel_inference(self) -> None:
+        """强制终止推理并重置 UI 状态"""
+        if self._infer_worker and self._infer_worker.isRunning():
+            self._infer_worker.terminate()
+            self._infer_worker.wait(3000)
+        self._inferring = False
+        self._update_ui_state()
 
     # ---- 持久化 ----
 
