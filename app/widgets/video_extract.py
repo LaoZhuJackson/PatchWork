@@ -11,14 +11,13 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
     QHBoxLayout,
-    QRadioButton,
     QVBoxLayout,
     QWidget,
 )
 from qfluentwidgets import (
     PushButton, PrimaryPushButton, LineEdit, ProgressBar,
     BodyLabel, StrongBodyLabel, SubtitleLabel,
-    ComboBox, CardWidget, DoubleSpinBox,
+    ComboBox, CardWidget, RadioButton, DoubleSpinBox,
 )
 
 from app.services.video_extractor import extract_frames
@@ -114,8 +113,8 @@ class VideoExtractPanel(QWidget):
 
         # 模式选择
         mode_row = QHBoxLayout()
-        self.time_radio = QRadioButton("按时间间隔")
-        self.frame_radio = QRadioButton("按帧间隔")
+        self.time_radio = RadioButton("按时间间隔")
+        self.frame_radio = RadioButton("按帧间隔")
         self.time_radio.setChecked(True)
         self._mode_group = QButtonGroup(self)
         self._mode_group.addButton(self.time_radio, 0)
