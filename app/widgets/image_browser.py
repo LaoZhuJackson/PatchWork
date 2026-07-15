@@ -87,7 +87,11 @@ class ImageBrowser(QWidget):
         self.next_btn.setParent(self.viewer)
         self.next_btn.clicked.connect(self.go_next)
 
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         layout.addWidget(preview_container, 1)
+
+        # 点击 viewer 也让 ImageBrowser 获得焦点
+        self.viewer.viewport().installEventFilter(self)
 
     # ---- 公共 API ----
 
@@ -169,6 +173,8 @@ class ImageBrowser(QWidget):
         if emit:
             self.image_selected.emit(idx, path)
 
+        self.setFocus()
+
     def _update_nav_buttons(self) -> None:
         total = self.thumb_list.count
         self.prev_btn.setEnabled(self._current_index > 0)
@@ -196,3 +202,17 @@ class ImageBrowser(QWidget):
         center_y = max(0, (vh - 48) // 2)
         self.prev_btn.move(12, center_y)
         self.next_btn.move(max(0, vw - 60), center_y)
+
+    def keyPressEvent(self, event) -> None:
+        if event.key() == Qt.Key.Key_Left:
+            self.go_prev()
+        elif event.key() == Qt.Key.Key_Right:
+            self.go_next()
+        else:
+            super().keyPressEvent(event)
+
+    def eventFilter(self, obj, event) -> bool:
+        if event.type() == event.type().MouseButtonPress:
+            self.setFocus()
+        return super().eventFilter(obj, event)
+

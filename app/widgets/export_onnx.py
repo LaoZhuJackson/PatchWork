@@ -142,7 +142,7 @@ class ExportONNXPanel(QWidget):
     # ---- 事件 ----
     def _browse_model(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
-            self, "选择 YOLO 模型", "",
+            self, "选择 YOLO 模型", self.model_edit.text(),
             "Model Files (*.pt *.pth);;All Files (*)"
         )
         if path:

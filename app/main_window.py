@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QLabel
 from app.utils.config import get_str, set_str
 from app.widgets.dataset_split import DatasetSplitPanel
 from app.widgets.export_onnx import ExportONNXPanel
+from app.widgets.gpu_monitor import GPUMonitorPanel
 from app.widgets.label_preview import LabelPreviewPanel
 from app.widgets.model_infer import ModelInferPanel
 from app.widgets.video_extract import VideoExtractPanel
@@ -29,7 +30,7 @@ class MainWindow(FluentWindow):
             "label_preview": LabelPreviewPanel(),
             "export_onnx": ExportONNXPanel(),
             "video_extract": VideoExtractPanel(),
-            "gpu_monitor": QLabel("🖥️ GPU监控"),
+            "gpu_monitor": GPUMonitorPanel(),
             "xanylabeling": QLabel("🔧 X-AnyLabeling"),
         }
 
