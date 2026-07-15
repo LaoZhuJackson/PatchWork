@@ -220,8 +220,6 @@ def fetch_via_gpustat(
 
     return _parse_gpustat_json(data)
 
-    return _parse_gpustat_json(data)
-
 
 def fetch_via_http(
     api_url: str,

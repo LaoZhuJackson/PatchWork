@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QLabel,
+    QScrollArea,
     QVBoxLayout,
     QWidget,
     QProgressBar,
@@ -14,7 +15,7 @@ from PySide6.QtWidgets import (
 from qfluentwidgets import (
     PushButton, PrimaryPushButton, LineEdit, ProgressBar,
     BodyLabel, StrongBodyLabel, SubtitleLabel,
-    CardWidget, PasswordLineEdit, SpinBox, RadioButton,
+    CardWidget, PasswordLineEdit, SpinBox, RadioButton, ScrollArea,
 )
 
 from app.services.gpu_client import (
@@ -230,13 +231,19 @@ class GPUMonitorPanel(QWidget):
         layout.addWidget(self.progress)
 
         # ============================================================
-        # GPU 卡片区
+        # GPU 卡片区（可滚动）
         # ============================================================
+        self.cards_scroll = ScrollArea()
+        self.cards_scroll.setWidgetResizable(True)
+        self.cards_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+
         self.cards_widget = QWidget()
         self.cards_layout = QVBoxLayout(self.cards_widget)
         self.cards_layout.setSpacing(8)
         self.cards_layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.cards_widget, 1)
+
+        self.cards_scroll.setWidget(self.cards_widget)
+        layout.addWidget(self.cards_scroll, 1)
 
     # ============================================================
     # 模式切换
