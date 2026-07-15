@@ -8,11 +8,14 @@ from qfluentwidgets import setTheme, Theme
 
 from app.main_window import MainWindow
 from app.utils.config import get_str
+from app.utils.crash_handler import setup_crash_handler
 from app.utils.logger import setup_logging
 from app.utils.message import error, warning
 
 
 def main() -> None:
+    setup_crash_handler()
+
     app = QApplication(sys.argv)
     app.setApplicationName("PatchWork")
 

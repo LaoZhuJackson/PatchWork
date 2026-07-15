@@ -33,7 +33,7 @@ _logger: logging.Logger | None = None
 _qt_handler: QtLogHandler | None = None
 
 
-def _get_app_root() -> Path:
+def get_app_root() -> Path:
     """应用根目录：开发时=项目根，打包后=exe 同级"""
     if getattr(sys, "frozen", False):
         # PyInstaller 打包后运行
@@ -54,7 +54,7 @@ def setup_logging(log_dir: Path | None = None) -> QtLogHandler:
     if _logger is not None and _qt_handler is not None:
         return _qt_handler  # 已经初始化过，直接返回
     if log_dir is None:
-        log_dir = _get_app_root() / "logs"
+        log_dir = get_app_root() / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
 
     _logger = logging.getLogger("patchwork")
