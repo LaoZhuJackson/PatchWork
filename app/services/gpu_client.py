@@ -180,29 +180,41 @@ def fetch_via_gpustat(
     password: str = "",
     key_path: str = "",
     gpustat_cmd: str = "gpustat --json",
+    conda_env: str = "",
     timeout: int = 10,
 ) -> list[GPUInfo]:
     """SSH + gpustat --json 解析。
 
-    Raises:
-        paramiko.AuthenticationException
-        RuntimeError: gpustat 未安装或执行失败
+    Args:
+        conda_env: 可选，conda 环境名。不为空时自动拼接激活命令。
     """
+    # 拼接 conda 激活前缀
+    if conda_env:
+        cmd = (
+            f"source ~/.bashrc 2>/dev/null; "
+            f"conda activate {conda_env} 2>/dev/null; "
+            f"{gpustat_cmd}"
+        )
+    else:
+        cmd = gpustat_cmd
+
     results = _ssh_exec(
         host, port, username, password, key_path,
-        [gpustat_cmd], timeout,
+        [cmd], timeout,
     )
 
     try:
         data = json.loads(results[0])
     except json.JSONDecodeError:
-        # 可能是 conda 环境不对，尝试 source bashrc 后再跑
+        # 可能 conda 路径不对，尝试直接跑
         results = _ssh_exec(
             host, port, username, password, key_path,
-            [f"source ~/.bashrc 2>/dev/null; {gpustat_cmd}"],
+            [gpustat_cmd],
             timeout,
         )
         data = json.loads(results[0])
+
+    return _parse_gpustat_json(data)
 
     return _parse_gpustat_json(data)
 
