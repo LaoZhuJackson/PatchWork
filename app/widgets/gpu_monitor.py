@@ -3,17 +3,17 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-  QFormLayout,
-  QHBoxLayout,
-  QLabel,
-  QVBoxLayout,
-  QWidget,
-  QProgressBar,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QVBoxLayout,
+    QWidget,
+    QProgressBar,
 )
 from qfluentwidgets import (
-  PushButton, PrimaryPushButton, LineEdit, ProgressBar,
-  BodyLabel, StrongBodyLabel, SubtitleLabel,
-  CardWidget, PasswordLineEdit, SpinBox,
+    PushButton, PrimaryPushButton, LineEdit, ProgressBar,
+    BodyLabel, StrongBodyLabel, SubtitleLabel,
+    CardWidget, PasswordLineEdit, SpinBox,
 )
 
 from app.services.gpu_client import fetch_gpu_info, GPUInfo
@@ -21,9 +21,11 @@ from app.utils.config import get_str, set_str, get_int, set_int
 from app.utils.message import error, info
 from app.utils.worker import Worker
 
+
 class GPUWorker(Worker):
     """后台 SSH 获取 GPU 信息"""
-    def __init__(self, host:str, port: int, username:str, password: str, key_path: str) -> None:
+
+    def __init__(self, host: str, port: int, username: str, password: str, key_path: str) -> None:
         super().__init__()
         self.host = host
         self.port = port
@@ -36,6 +38,7 @@ class GPUWorker(Worker):
             self.host, self.port, self.username, self.password, self.key_path
         )
 
+
 class GPUMonitorPanel(QWidget):
     """远程 GPU 监控面板"""
     status_message = Signal(str)
@@ -43,8 +46,8 @@ class GPUMonitorPanel(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self.setObjectName("gpu_monitor_panel")
-        self._worker:GPUWorker | None = None
-        self._session_password: str = "" # 仅会话内存活
+        self._worker: GPUWorker | None = None
+        self._session_password: str = ""  # 仅会话内存活
 
         self._setup_ui()
         self._load_settings()
@@ -155,6 +158,9 @@ class GPUMonitorPanel(QWidget):
         self.progress.setValue(0)
         self.status_label.setText("正在连接...")
 
+        self._worker = GPUWorker(
+            host, port, username, self._session_password, key_path
+        )
         self._worker.finished.connect(self._on_finished)
         self._worker.error.connect(self._on_error)
         self._worker.start()
@@ -244,4 +250,3 @@ class GPUMonitorPanel(QWidget):
         self.user_edit.setText(get_str("gpu_username", ""))
         self.key_edit.setText(get_str("gpu_key_path", ""))
         self.pwd_edit.setText(self._session_password)
-

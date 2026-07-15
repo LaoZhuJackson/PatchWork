@@ -5,9 +5,10 @@ from dataclasses import dataclass, field
 
 import paramiko
 
+
 @dataclass
 class GPUInfo:
-    index:int
+    index: int
     name: str
     utilization: int
     memory_used: int
@@ -20,7 +21,9 @@ class GPUInfo:
             return round(self.memory_used / self.memory_total * 100, 1)
         return 0.0
 
-def fetch_gpu_info(host: str, port: int = 22, username: str = "", password: str = "", key_path: str = "") -> list[GPUInfo]:
+
+def fetch_gpu_info(host: str, port: int = 22, username: str = "", password: str = "", key_path: str = "") -> list[
+    GPUInfo]:
     """SSH 连接远程服务器，解析 nvidia-smi 输出。
 
     Raises:
@@ -89,4 +92,3 @@ def fetch_gpu_info(host: str, port: int = 22, username: str = "", password: str 
     finally:
         client.close()
     return list(gpus.values())
-
