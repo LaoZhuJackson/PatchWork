@@ -12,6 +12,7 @@ from app.widgets.gpu_monitor import GPUMonitorPanel
 from app.widgets.label_preview import LabelPreviewPanel
 from app.widgets.model_infer import ModelInferPanel
 from app.widgets.video_extract import VideoExtractPanel
+from app.widgets.xanylabeling import XAnyLabelingPanel
 
 
 class MainWindow(FluentWindow):
@@ -31,7 +32,7 @@ class MainWindow(FluentWindow):
             "export_onnx": ExportONNXPanel(),
             "video_extract": VideoExtractPanel(),
             "gpu_monitor": GPUMonitorPanel(),
-            "xanylabeling": QLabel("🔧 X-AnyLabeling"),
+            "xanylabeling": XAnyLabelingPanel(),
         }
 
         for name, widget in self._placeholder.items():
@@ -44,8 +45,18 @@ class MainWindow(FluentWindow):
 
         # ----- 导航栏上半区（功能入口） -----
         self.addSubInterface(
+            self._placeholder["video_extract"],
+            FIF.MEDIA, "视频抽帧",
+            position=NavigationItemPosition.TOP,
+        )
+        self.addSubInterface(
             self._placeholder["dataset_split"],
             FIF.APPLICATION, "数据集划分",
+            position=NavigationItemPosition.TOP,
+        )
+        self.addSubInterface(
+            self._placeholder["gpu_monitor"],
+            FIF.IOT, "GPU监控",
             position=NavigationItemPosition.TOP,
         )
         self.addSubInterface(
@@ -54,32 +65,22 @@ class MainWindow(FluentWindow):
             position=NavigationItemPosition.TOP,
         )
         self.addSubInterface(
-            self._placeholder["label_preview"],
-            FIF.TILES, "Label预览",
-            position=NavigationItemPosition.TOP,
-        )
-        self.addSubInterface(
             self._placeholder["export_onnx"],
             FIF.SAVE_AS, "导出ONNX",
             position=NavigationItemPosition.TOP,
         )
         self.addSubInterface(
-            self._placeholder["video_extract"],
-            FIF.MEDIA, "视频抽帧",
+            self._placeholder["label_preview"],
+            FIF.TILES, "Label预览",
             position=NavigationItemPosition.TOP,
         )
         self.addSubInterface(
-            self._placeholder["gpu_monitor"],
-            FIF.IOT, "GPU监控",
+            self._placeholder["xanylabeling"],
+            FIF.LINK, "X-AnyLabeling",
             position=NavigationItemPosition.TOP,
         )
 
         # ----- 导航栏下半区（工具入口） -----
-        self.addSubInterface(
-            self._placeholder["xanylabeling"],
-            FIF.LINK, "X-AnyLabeling",
-            position=NavigationItemPosition.BOTTOM,
-        )
         # 主题切换按钮（不切换页面，仅触发回调）
         icon = FIF.CONSTRACT
         self.navigationInterface.addItem(
