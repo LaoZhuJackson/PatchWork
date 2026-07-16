@@ -49,10 +49,13 @@ class SahiFolderWorker(Worker):
         self.save_vis = save_vis
         self.save_txt = save_txt
 
-    def do_work(self) -> int:
+    def do_work(self) -> dict:
+        """返回 {"total": int, "annotations": dict[str, list[dict]]}"""
         total = len(self.image_paths)
+        all_anns: dict[str, list[dict]] = {}
         for i, img_path in enumerate(self.image_paths):
             annotations = self.service.infer_image(img_path)
+            all_anns[str(img_path)] = annotations
 
             # 保存可视化
             if self.save_vis:
@@ -67,7 +70,7 @@ class SahiFolderWorker(Worker):
                 self._save_yolo_txt(txt_dir / f"{img_path.stem}.txt", annotations)
 
             self.progress.emit(int((i + 1) / total * 100))
-        return total
+        return {"total": total, "annotations": all_anns}
 
     def _save_yolo_txt(self, path: Path, annotations: list[dict]) -> None:
         """保存 YOLO 格式标签"""
@@ -286,6 +289,7 @@ class SahiInferPanel(QWidget):
 
         # ---- 预览区 ----
         self.browser = ImageBrowser()
+        self.browser.image_selected.connect(self._on_browser_selected)
         layout.addWidget(self.browser, 1)
 
     # ---- 构建 service ----
@@ -370,11 +374,14 @@ class SahiInferPanel(QWidget):
         if path:
             self.browser.set_images([path])
             self.browser.show_annotations(annotations)
+            self._all_annotations = {str(path): annotations}
 
         self.status_label.setText(f"检测到 {len(annotations)} 个目标")
 
     # ---- 批量 ----
     def _on_batch(self) -> None:
+        self._all_annotations = {}
+
         service = self._build_service()
         if service is None:
             error("错误", "请选择有效的模型文件", self)
@@ -394,13 +401,17 @@ class SahiInferPanel(QWidget):
         if not images:
             error("错误", "未找到图片文件", self)
             return
-
+        self._last_images = images
         output_dir.mkdir(parents=True, exist_ok=True)
 
         self.batch_btn.setEnabled(False)
+        self.preview_btn.setEnabled(False)
         self.progress.setVisible(True)
         self.progress.setValue(0)
         self.status_label.setText(f"批量推理 {len(images)} 张...")
+
+        self._last_output_dir = output_dir
+        self._last_save_vis = self.vis_check.isChecked()
 
         self._worker = SahiFolderWorker(
             service, images, output_dir,
@@ -411,11 +422,24 @@ class SahiInferPanel(QWidget):
         self._worker.error.connect(self._on_error)
         self._worker.start()
 
-    def _on_batch_done(self, total: int) -> None:
+    def _on_batch_done(self, result: dict) -> None:
+        total = result["total"]
+        self._all_annotations = result["annotations"]
+
         self.batch_btn.setEnabled(True)
+        self.preview_btn.setEnabled(True)
         self.progress.setVisible(False)
         self.status_label.setText(f"✅ 完成 {total} 张")
+
+        if self._last_images:
+            self.browser.set_images(self._last_images)
         info("批量推理完成", f"共处理 {total} 张图片", self)
+
+    def _on_browser_selected(self, idx: int, path: Path) -> None:
+        """点击缩略图 → 取缓存标注叠加"""
+        key = str(path)
+        anns = self._all_annotations.get(key, []) if hasattr(self, '_all_annotations') else []
+        self.browser.show_annotations(anns)
 
     def _on_error(self, err_msg: str) -> None:
         self.preview_btn.setEnabled(True)
