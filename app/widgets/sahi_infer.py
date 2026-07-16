@@ -206,15 +206,16 @@ class SahiInferPanel(QWidget):
         self.iou_spin.setDecimals(2)
         self.iou_spin.setValue(0.7)
         self.iou_spin.valueChanged.connect(lambda v: set_float("sahi_iou", v))
-        thr_row.addWidget(self.iou_spin)
-        thr_row.addStretch()
-        infer_form.addRow(BodyLabel("阈值:"), thr_row)
 
         self.standard_check = CheckBox("同时执行整图预测")
         self.standard_check.setChecked(True)
         self.standard_check.stateChanged.connect(
             lambda: set_bool("sahi_standard_pred", self.standard_check.isChecked()))
-        infer_form.addRow(BodyLabel(""), self.standard_check)
+
+        thr_row.addWidget(self.iou_spin)
+        thr_row.addWidget(self.standard_check)
+        thr_row.addStretch()
+        infer_form.addRow(BodyLabel("阈值:"), thr_row)
 
         layout.addWidget(infer_card)
 
