@@ -43,8 +43,13 @@ class SahiInferenceService:
             device=self.config.device,
         )
 
+    def _ensure_loaded(self) -> None:
+        if self._model is None:
+            self.load_model()
+
     def infer_image(self, image_path: Path) -> list[dict]:
         """对单张图片执行切片推理，返回统一标注列表"""
+        self._ensure_loaded()
         if self._model is None:
             raise RuntimeError("SAHI 模型未加载")
 
@@ -106,6 +111,7 @@ class SahiInferenceService:
 
     def save_visualization(self, image_path: Path, output_path: Path) -> None:
         """保存带标注的可视化图片"""
+        self._ensure_loaded()
         result = get_sliced_prediction(
             image=str(image_path),
             detection_model=self._model,
