@@ -84,7 +84,7 @@ class DatasetSplitPanel(QWidget):
         path_outer.addLayout(path_form)
 
         self.img_edit = LineEdit()
-        img_btn = PushButton("浏览...")
+        img_btn = PushButton("📁")
         img_btn.clicked.connect(lambda: self._browse_dir(self.img_edit, "img_dir"))
         img_row = QHBoxLayout()
         img_row.addWidget(self.img_edit, 1)
@@ -92,7 +92,7 @@ class DatasetSplitPanel(QWidget):
         path_form.addRow(BodyLabel("图片目录:"), img_row)
 
         self.lbl_edit = LineEdit()
-        lbl_btn = PushButton("浏览...")
+        lbl_btn = PushButton("📁")
         lbl_btn.clicked.connect(lambda: self._browse_dir(self.lbl_edit, "lbl_dir"))
         lbl_row = QHBoxLayout()
         lbl_row.addWidget(self.lbl_edit, 1)
@@ -100,7 +100,7 @@ class DatasetSplitPanel(QWidget):
         path_form.addRow(BodyLabel("标签目录:"), lbl_row)
 
         self.out_edit = LineEdit()
-        out_btn = PushButton("浏览...")
+        out_btn = PushButton("📁")
         out_btn.clicked.connect(lambda: self._browse_dir(self.out_edit, "out_dir"))
         out_row = QHBoxLayout()
         out_row.addWidget(self.out_edit, 1)

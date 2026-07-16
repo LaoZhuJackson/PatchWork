@@ -96,7 +96,7 @@ class ModelInferPanel(QWidget):
         self.model_edit.setReadOnly(True)
         model_row.addWidget(self.model_edit, 1)
 
-        model_btn = PushButton("浏览...")
+        model_btn = PushButton("📁")
         model_btn.clicked.connect(self._browse_model)
         model_row.addWidget(model_btn)
         toolbar.addLayout(model_row)
@@ -108,7 +108,7 @@ class ModelInferPanel(QWidget):
         self.folder_edit.setReadOnly(True)
         img_row.addWidget(self.folder_edit, 1)
 
-        folder_btn = PushButton("浏览...")
+        folder_btn = PushButton("📁")
         folder_btn.clicked.connect(self._browse_folder)
         img_row.addWidget(folder_btn)
         toolbar.addLayout(img_row)

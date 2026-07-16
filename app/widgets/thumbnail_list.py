@@ -65,6 +65,7 @@ class ThumbnailList(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         self._list = QListWidget()
+        self._list.setStyleSheet("QListWidget { background: transparent; }")
         self._list.setFlow(QListWidget.Flow.LeftToRight)
         self._list.setViewMode(QListWidget.ViewMode.IconMode)
         self._list.setIconSize(THUMB_SIZE)
