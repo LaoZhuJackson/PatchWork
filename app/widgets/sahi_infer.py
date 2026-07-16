@@ -319,20 +319,19 @@ class SahiInferPanel(QWidget):
             set_str("sahi_model_path", path)
 
     def _browse_file(self) -> None:
-        # 先试选文件
         path, _ = QFileDialog.getOpenFileName(
-            self, "选择图片", "", "Image Files (*.jpg *.jpeg *.png *.bmp);;All Files (*)"
+            self, "选择图片", self.input_edit.text(), "Image Files (*.jpg *.jpeg *.png *.bmp);;All Files (*)"
         )
         if path:
             self.input_edit.setText(path)
 
     def _browse_folder(self) -> None:
-        path = QFileDialog.getExistingDirectory(self, "选择图片文件夹")
+        path = QFileDialog.getExistingDirectory(self, "选择图片文件夹", self.input_edit.text())
         if path:
             self.input_edit.setText(path)
 
     def _browse_output(self) -> None:
-        path = QFileDialog.getExistingDirectory(self, "选择输出目录")
+        path = QFileDialog.getExistingDirectory(self, "选择输出目录", self.output_edit.text())
         if path:
             self.output_edit.setText(path)
             set_str("sahi_output", path)
