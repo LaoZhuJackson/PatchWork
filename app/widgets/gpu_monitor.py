@@ -231,13 +231,15 @@ class GPUMonitorPanel(QWidget):
         layout.addWidget(self.progress)
 
         # ============================================================
-        # GPU 卡片区（可滚动）
+        # GPU 卡片区
         # ============================================================
         self.cards_scroll = ScrollArea()
         self.cards_scroll.setWidgetResizable(True)
         self.cards_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        self.cards_scroll.setStyleSheet("ScrollArea { background: transparent; }")
 
         self.cards_widget = QWidget()
+        self.cards_widget.setStyleSheet("background: transparent;")
         self.cards_layout = QVBoxLayout(self.cards_widget)
         self.cards_layout.setSpacing(8)
         self.cards_layout.setContentsMargins(0, 0, 0, 0)
