@@ -39,7 +39,6 @@ class SahiInferWorker(Worker):
 
 class SahiFolderWorker(Worker):
     """后台 SAHI 批量推理"""
-    finished = Signal(int, str)  # 成功数, 输出目录路径
 
     def __init__(self, service: SahiInferenceService, image_paths: list[Path], output_dir: Path, save_vis: bool,
                  save_txt: bool) -> None:
@@ -403,6 +402,10 @@ class SahiInferPanel(QWidget):
         self.progress.setValue(0)
         self.status_label.setText(f"批量推理 {len(images)} 张...")
 
+        self._worker = SahiFolderWorker(
+            service, images, output_dir,
+            self.vis_check.isChecked(), self.txt_check.isChecked(),
+        )
         self._worker.progress.connect(self.progress.setValue)
         self._worker.finished.connect(self._on_batch_done)
         self._worker.error.connect(self._on_error)
