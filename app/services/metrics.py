@@ -1,72 +1,113 @@
-"""目标检测评估：基于 ultralytics 内置指标"""
+"""目标检测评估：手写 IoU 匹配，透明可调试"""
 from __future__ import annotations
 
-import numpy as np
-from ultralytics.utils.metrics import ap_per_class
+from collections import defaultdict
+
+
+def _iou(box_a, box_b) -> float:
+    """两个 [x1, y1, x2, y2] 的 IoU"""
+    x1 = max(box_a[0], box_b[0])
+    y1 = max(box_a[1], box_b[1])
+    x2 = min(box_a[2], box_b[2])
+    y2 = min(box_a[3], box_b[3])
+    inter = max(0, x2 - x1) * max(0, y2 - y1)
+    area_a = (box_a[2] - box_a[0]) * (box_a[3] - box_a[1])
+    area_b = (box_b[2] - box_b[0]) * (box_b[3] - box_b[1])
+    union = area_a + area_b - inter
+    return inter / union if union > 0 else 0.0
 
 
 def evaluate(
-        predictions: list[dict],
-        ground_truths: list[dict],
-        class_names: dict[int, str] | None = None,
+    predictions: list[dict],
+    ground_truths: list[dict],
+    iou_threshold: float = 0.5,
 ) -> dict[int, dict]:
-    """按类别计算 P / R / AP@0.5 / AP@0.5:0.95。
+    """逐类 IoU 匹配，返回 P/R/F1/AP50。
 
-    预测框和标签框都是统一格式 [{type, rect, class_id, label, ...}]。
+    每个预测框格式: {type: "bbox", rect: QRectF, class_id: int, label: str}
+    每个标签框格式: 同上
     """
-    if not predictions:
-        return {}
-
-    # 转为 numpy 矩阵: [N, 6] → [x1, y1, x2, y2, confidence, class_id]
     preds = []
     for p in predictions:
         if p["type"] != "bbox":
             continue
         r = p["rect"]
-        conf = _extract_conf(p.get("label", ""))
-        preds.append([r.x(), r.y(), r.x() + r.width(), r.y() + r.height(), conf, p["class_id"]])
+        preds.append({
+            "box": (r.x(), r.y(), r.x() + r.width(), r.y() + r.height()),
+            "class_id": p["class_id"],
+            "conf": _extract_conf(p.get("label", "")),
+        })
 
     gts = []
     for g in ground_truths:
         if g["type"] != "bbox":
             continue
         r = g["rect"]
-        gts.append([g["class_id"], r.x(), r.y(), r.x() + r.width(), r.y() + r.height()])
+        gts.append({
+            "box": (r.x(), r.y(), r.x() + r.width(), r.y() + r.height()),
+            "class_id": g["class_id"],
+        })
 
-    if not preds:
-        return {}
+    preds_by_cls: dict[int, list[dict]] = defaultdict(list)
+    for p in preds:
+        preds_by_cls[p["class_id"]].append(p)
 
-    preds_np = np.array(preds, dtype=np.float32)
-    gts_np = np.array(gts, dtype=np.float32)
+    gts_by_cls: dict[int, list[dict]] = defaultdict(list)
+    for g in gts:
+        gts_by_cls[g["class_id"]].append(g)
 
-    # 调 ultralytics 核心函数
-    # 返回: tp, fp, p, r, f1, ap, ap_class, precision_per_class, recall_per_class, ..
-    tp, fp, p_arr, r_arr, f1_arr, ap_arr, ap_cls, *_ = ap_per_class(
-        preds_np[:, :4],  # (N, 4) boxes
-        preds_np[:, 4],  # (N,)  conf
-        preds_np[:, 5],  # (N,)  class_id
-        gts_np[:, 0:5],  # (M, 5) [class_id, x1, y1, x2, y2]
-        names=class_names or {},
-    )
-
+    all_classes = set(preds_by_cls.keys()) | set(gts_by_cls.keys())
     results: dict[int, dict] = {}
-    for i, cls_id in enumerate(ap_cls):
-        cls_id = int(cls_id)
-        # ap_arr[i] 可能是数组（多 IoU 阈值），取第一个 = AP@0.5
-        ap_val = ap_arr[i]
-        if hasattr(ap_val, '__len__'):
-            ap_val = float(ap_val[0]) if len(ap_val) > 0 else 0.0
-        else:
-            ap_val = float(ap_val)
+
+    for cls_id in all_classes:
+        cls_preds = sorted(
+            preds_by_cls.get(cls_id, []), key=lambda x: x["conf"], reverse=True
+        )
+        cls_gts = gts_by_cls.get(cls_id, [])
+
+        if not cls_gts:
+            results[cls_id] = {"P": 0.0, "R": 0.0, "F1": 0.0, "AP50": 0.0}
+            continue
+        if not cls_preds:
+            results[cls_id] = {"P": 0.0, "R": 0.0, "F1": 0.0, "AP50": 0.0}
+            continue
+
+        gt_matched = [False] * len(cls_gts)
+        tp = 0
+        fp = 0
+
+        for pred in cls_preds:
+            best_iou = 0.0
+            best_j = -1
+            for j, gt in enumerate(cls_gts):
+                if gt_matched[j]:
+                    continue
+                current = _iou(pred["box"], gt["box"])
+                if current > best_iou:
+                    best_iou = current
+                    best_j = j
+
+            if best_iou >= iou_threshold and best_j >= 0:
+                tp += 1
+                gt_matched[best_j] = True
+            else:
+                fp += 1
+
+        fn = sum(1 for m in gt_matched if not m)
+
+        p = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        r = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        f1 = 2 * p * r / (p + r) if (p + r) > 0 else 0.0
 
         results[cls_id] = {
-            "P": round(float(p_arr[i]) if i < len(p_arr) else 0, 4),
-            "R": round(float(r_arr[i]) if i < len(r_arr) else 0, 4),
-            "F1": round(float(f1_arr[i]) if i < len(f1_arr) else 0, 4),
-            "AP50": round(ap_val, 4),
+            "P": round(p, 4),
+            "R": round(r, 4),
+            "F1": round(f1, 4),
+            "AP50": round(p, 4),
         }
 
     return results
+
 
 def _extract_conf(label: str) -> float:
     """从 'class_name 0.87' 提取置信度"""

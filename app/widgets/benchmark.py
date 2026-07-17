@@ -201,14 +201,6 @@ class BenchmarkPanel(QWidget):
         self.table.setAlternatingRowColors(True)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.table, 1)
-        self._init_empty_table()
-
-    def _init_empty_table(self) -> None:
-        """初始化空表格（仅表头）"""
-        columns = ["方法", "mAP", "P_mean", "R_mean", "F1_mean", "耗时(s)"]
-        self.table.setRowCount(0)
-        self.table.setColumnCount(len(columns))
-        self.table.setHorizontalHeaderLabels(columns)
 
     # ============================================================
     # 构建可折叠方法行
