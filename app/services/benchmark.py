@@ -88,4 +88,5 @@ class BenchmarkRunner(Worker):
                 "per_class": per_class_combined,
                 "time": round(elapsed, 1),
             })
+        return results
 

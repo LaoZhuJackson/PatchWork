@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QHeaderView,
+    QSizePolicy,
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
@@ -220,33 +221,59 @@ class BenchmarkPanel(QWidget):
         # 配置区（默认隐藏）
         config_widget = QWidget()
         config_widget.setVisible(False)
+        config_widget.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Maximum,
+        )
         config_layout = FlowLayout(config_widget)
         config_layout.setContentsMargins(8, 4, 0, 4)
-        config_layout.setSpacing(8)
+        config_layout.setSpacing(10)
         setattr(self, config_attr, config_widget)
 
-        # 根据配置列表创建控件
+        # 根据配置列表创建控件。
+        # 标签和 SpinBox 必须放进同一个容器，否则 FlowLayout 会把二者
+        # 当成两个独立元素换行，SAHI 参数较多时就会出现错位和挤压。
         for item in configs:
-            if len(item) == 3:
-                # 纯标签
-                label, attr_name, widget_class = item
-            else:
-                label, attr_name, widget_class, rmin, rmax, default, step, decimals, callback = item
+            label, attr_name, widget_class, rmin, rmax, default, step, decimals, callback = item
+
+            field_widget = QWidget(config_widget)
+            field_widget.setSizePolicy(
+                QSizePolicy.Policy.Fixed,
+                QSizePolicy.Policy.Fixed,
+            )
+            field_layout = QHBoxLayout(field_widget)
+            field_layout.setContentsMargins(0, 0, 0, 0)
+            field_layout.setSpacing(6)
 
             lbl = BodyLabel(label)
-            config_layout.addWidget(lbl)
+            self._normalize_point_font(lbl)
+            field_layout.addWidget(lbl)
+
             spin = widget_class()
             spin.setRange(rmin, rmax)
-            if hasattr(spin, 'setSingleStep'):
+            spin.setMinimumWidth(132)
+            spin.setSizePolicy(
+                QSizePolicy.Policy.Fixed,
+                QSizePolicy.Policy.Fixed,
+            )
+            if hasattr(spin, "setSingleStep"):
                 spin.setSingleStep(step)
-            if hasattr(spin, 'setDecimals') and decimals > 0:
+            if hasattr(spin, "setDecimals"):
                 spin.setDecimals(decimals)
-            if hasattr(spin, 'setValue'):
+            if hasattr(spin, "setValue"):
                 spin.setValue(default)
-            if hasattr(spin, 'valueChanged'):
+            if hasattr(spin, "valueChanged"):
                 spin.valueChanged.connect(callback)
+
+            # qfluentwidgets 默认使用像素字号；部分 PySide6/Qt 版本在控件
+            # 从隐藏变为显示时会读取 pointSize()，此时返回 -1 并触发警告。
+            self._normalize_point_font(spin)
+            if hasattr(spin, "lineEdit") and spin.lineEdit() is not None:
+                spin.lineEdit().setFont(spin.font())
+
             setattr(self, attr_name, spin)
-            config_layout.addWidget(spin)
+            field_layout.addWidget(spin)
+            config_layout.addWidget(field_widget)
 
         parent_layout.addWidget(config_widget)
 
@@ -254,6 +281,22 @@ class BenchmarkPanel(QWidget):
         toggle.clicked.connect(
             lambda: self._toggle_config(config_widget, toggle)
         )
+
+    @staticmethod
+    def _normalize_point_font(widget: QWidget) -> None:
+        """把像素字号转换为等效 point size，避免 Qt 读取到 pointSize=-1。"""
+        font = widget.font()
+        if font.pointSizeF() > 0:
+            return
+
+        pixel_size = font.pixelSize()
+        if pixel_size <= 0:
+            return
+
+        dpi = widget.logicalDpiY()
+        point_size = pixel_size * 72.0 / dpi if dpi > 0 else 10.5
+        font.setPointSizeF(max(point_size, 1.0))
+        widget.setFont(font)
 
     @staticmethod
     def _toggle_config(widget: QWidget, btn: ToolButton) -> None:
