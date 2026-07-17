@@ -517,6 +517,15 @@ class BenchmarkPanel(QWidget):
         self.sahi_ow.setValue(get_float("bm_sahi_ow", 0.25))
         self.sahi_oh.setValue(get_float("bm_sahi_oh", 0.25))
 
+        self.track_check.setChecked(get_bool("bm_track_enabled", False))
+        self.track_conf.setValue(get_float("bm_track_conf", 0.25))
+        self.track_iou.setValue(get_float("bm_track_iou", 0.7))
+        self.track_imgsz.setValue(get_int("bm_track_imgsz", 640))
+        saved_tracker = get_str("bm_tracker", "BoT-SORT")
+        idx = self.track_tracker.findText(saved_tracker)
+        if idx >= 0:
+            self.track_tracker.setCurrentIndex(idx)
+
         self.model_edit.setText(get_str("bm_model_path", ""))
         self.img_edit.setText(get_str("bm_img_dir", ""))
         self.lbl_edit.setText(get_str("bm_lbl_dir", ""))
