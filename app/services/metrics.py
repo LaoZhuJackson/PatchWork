@@ -52,11 +52,18 @@ def evaluate(
     results: dict[int, dict] = {}
     for i, cls_id in enumerate(ap_cls):
         cls_id = int(cls_id)
+        # ap_arr[i] 可能是数组（多 IoU 阈值），取第一个 = AP@0.5
+        ap_val = ap_arr[i]
+        if hasattr(ap_val, '__len__'):
+            ap_val = float(ap_val[0]) if len(ap_val) > 0 else 0.0
+        else:
+            ap_val = float(ap_val)
+
         results[cls_id] = {
             "P": round(float(p_arr[i]) if i < len(p_arr) else 0, 4),
             "R": round(float(r_arr[i]) if i < len(r_arr) else 0, 4),
             "F1": round(float(f1_arr[i]) if i < len(f1_arr) else 0, 4),
-            "AP50": round(float(ap_arr[i]) if i < len(ap_arr) else 0, 4),
+            "AP50": round(ap_val, 4),
         }
 
     return results
