@@ -18,20 +18,25 @@ from PySide6.QtWidgets import (
 from qfluentwidgets import (
     LineEdit, ProgressBar,
     BodyLabel, StrongBodyLabel, SubtitleLabel,
-    CardWidget, CheckBox, DoubleSpinBox, SpinBox, TableWidget, FlowLayout, DropDownToolButton, PushButton,
-    PrimaryPushButton, PrimaryToolButton, ToolButton,
+    CardWidget, CheckBox, DoubleSpinBox, SpinBox, TableWidget, FlowLayout, PushButton,
+    PrimaryPushButton, ToolButton, ComboBox,
 )
 
 from app.adapters.base import InferenceAdapter
 from app.adapters.normal_adapter import NormalAdapter
 from app.adapters.sahi_adapter import SahiAdapter
 from app.services.benchmark import BenchmarkRunner
+from app.adapters.tracking_adapter import TrackingAdapter
 from app.utils.config import (
     get_str, set_str, get_float, set_float,
-    get_int, set_int, get_bool, set_bool,
-)
+    get_int, set_int, get_bool, )
 from app.utils.message import error
 from qfluentwidgets import FluentIcon as FIF
+
+TRACKER_CHOICES = {
+    "BoT-SORT": "botsort.yaml",
+    "ByteTrack": "bytetrack.yaml",
+}
 
 
 class BenchmarkPanel(QWidget):
@@ -151,6 +156,25 @@ class BenchmarkPanel(QWidget):
             ],
         )
 
+        # ---- 视频跟踪 ----
+        self._build_method_row(
+            method_layout,
+            check_attr="track_check",
+            toggle_attr="_track_toggle",
+            config_attr="_track_config",
+            name="YOLO + 跟踪器",
+            configs=[
+                ("跟踪器:", "track_tracker", ComboBox, 0, 0, "BoT-SORT", 0, 0,
+                 lambda v: set_str("bm_tracker", v)),
+                ("Conf:", "track_conf", DoubleSpinBox, 0.01, 1.0, 0.25, 0.05, 2,
+                 lambda v: set_float("bm_track_conf", v)),
+                ("IoU:", "track_iou", DoubleSpinBox, 0.01, 1.0, 0.7, 0.05, 2,
+                 lambda v: set_float("bm_track_iou", v)),
+                ("ImgSz:", "track_imgsz", SpinBox, 320, 2048, 640, 32, 0,
+                 lambda v: set_int("bm_track_imgsz", v)),
+            ],
+        )
+
         layout.addWidget(method_card)
 
         # ============================================================
@@ -185,18 +209,18 @@ class BenchmarkPanel(QWidget):
     def _make_toggle_btn(self) -> ToolButton:
         """创建折叠按钮"""
         btn = ToolButton(FIF.CARE_LEFT_SOLID, self)
-        btn.setFixedSize(28, 28)
+        btn.setFixedSize(20, 20)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         return btn
 
     def _build_method_row(
-        self,
-        parent_layout: QVBoxLayout,
-        check_attr: str,
-        toggle_attr: str,
-        config_attr: str,
-        name: str,
-        configs: list[tuple],
+            self,
+            parent_layout: QVBoxLayout,
+            check_attr: str,
+            toggle_attr: str,
+            config_attr: str,
+            name: str,
+            configs: list[tuple],
     ) -> None:
         """构建一行：[CheckBox 名称] ---- [▼]
 
@@ -249,30 +273,31 @@ class BenchmarkPanel(QWidget):
             self._normalize_point_font(lbl)
             field_layout.addWidget(lbl)
 
-            spin = widget_class()
-            spin.setRange(rmin, rmax)
-            spin.setMinimumWidth(132)
-            spin.setSizePolicy(
-                QSizePolicy.Policy.Fixed,
-                QSizePolicy.Policy.Fixed,
-            )
-            if hasattr(spin, "setSingleStep"):
-                spin.setSingleStep(step)
-            if hasattr(spin, "setDecimals"):
-                spin.setDecimals(decimals)
-            if hasattr(spin, "setValue"):
-                spin.setValue(default)
-            if hasattr(spin, "valueChanged"):
-                spin.valueChanged.connect(callback)
+            widget = widget_class()
+            if widget_class is ComboBox:
+                widget.addItems(["BoT-SORT", "ByteTrack"])
+                widget.setCurrentText(str(default))
+                widget.currentTextChanged.connect(callback)
+            elif widget_class is DoubleSpinBox:
+                widget.setRange(rmin, rmax)
+                widget.setSingleStep(step)
+                widget.setDecimals(decimals)
+                widget.setValue(default)
+                widget.valueChanged.connect(callback)
+            elif widget_class is SpinBox:
+                widget.setRange(int(rmin), int(rmax))
+                widget.setSingleStep(int(step))
+                widget.setValue(int(default))
+                widget.valueChanged.connect(callback)
 
             # qfluentwidgets 默认使用像素字号；部分 PySide6/Qt 版本在控件
             # 从隐藏变为显示时会读取 pointSize()，此时返回 -1 并触发警告。
-            self._normalize_point_font(spin)
-            if hasattr(spin, "lineEdit") and spin.lineEdit() is not None:
-                spin.lineEdit().setFont(spin.font())
+            self._normalize_point_font(widget)
+            if hasattr(widget, "lineEdit") and widget.lineEdit() is not None:
+                widget.lineEdit().setFont(widget.font())
 
-            setattr(self, attr_name, spin)
-            field_layout.addWidget(spin)
+            setattr(self, attr_name, widget)
+            field_layout.addWidget(widget)
             config_layout.addWidget(field_widget)
 
         parent_layout.addWidget(config_widget)
@@ -358,6 +383,16 @@ class BenchmarkPanel(QWidget):
                 slice_h=self.sahi_sh.value(),
                 overlap_w=self.sahi_ow.value(),
                 overlap_h=self.sahi_oh.value(),
+            ))
+
+        if self.track_check.isChecked():
+            tracker_name = self.track_tracker.currentText()
+            adapters.append(TrackingAdapter(
+                model_path,
+                tracker=TRACKER_CHOICES.get(tracker_name, "botsort.yaml"),
+                conf=self.track_conf.value(),
+                iou=self.track_iou.value(),
+                imgsz=self.track_imgsz.value(),
             ))
 
         if not adapters:
