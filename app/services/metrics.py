@@ -41,7 +41,7 @@ def evaluate(
 
     # 调 ultralytics 核心函数
     # 返回: tp, fp, p, r, f1, ap, ap_class, precision_per_class, recall_per_class, ..
-    tp, fp, p_arr, r_arr, f1_arr, ap_arr, ap_cls, _, _ = ap_per_class(
+    tp, fp, p_arr, r_arr, f1_arr, ap_arr, ap_cls, *_ = ap_per_class(
         preds_np[:, :4],  # (N, 4) boxes
         preds_np[:, 4],  # (N,)  conf
         preds_np[:, 5],  # (N,)  class_id
