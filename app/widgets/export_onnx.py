@@ -73,7 +73,7 @@ class ExportONNXPanel(QWidget):
         model_row = QHBoxLayout()
         self.model_edit = LineEdit()
         self.model_edit.setPlaceholderText("选择 YOLO .pt 模型文件...")
-        model_btn = PushButton("📁")
+        model_btn = PushButton("📄")
         model_btn.clicked.connect(self._browse_model)
         model_row.addWidget(self.model_edit, 1)
         model_row.addWidget(model_btn)

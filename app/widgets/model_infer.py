@@ -96,7 +96,7 @@ class ModelInferPanel(QWidget):
         self.model_edit.setReadOnly(True)
         model_row.addWidget(self.model_edit, 1)
 
-        model_btn = PushButton("📁")
+        model_btn = PushButton("📄")
         model_btn.clicked.connect(self._browse_model)
         model_row.addWidget(model_btn)
         toolbar.addLayout(model_row)

@@ -85,7 +85,7 @@ class VideoExtractPanel(QWidget):
         self.video_edit = LineEdit()
         self.video_edit.setPlaceholderText("选择视频文件...")
         self.video_edit.setReadOnly(True)
-        video_btn = PushButton("📁")
+        video_btn = PushButton("📄")
         video_btn.clicked.connect(self._browse_video)
         video_row.addWidget(self.video_edit, 1)
         video_row.addWidget(video_btn)

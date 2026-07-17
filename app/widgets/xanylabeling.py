@@ -46,7 +46,7 @@ class XAnyLabelingPanel(QWidget):
         exe_row = QHBoxLayout()
         self.exe_edit = LineEdit()
         self.exe_edit.setPlaceholderText("选择 X-AnyLabeling.exe ...")
-        exe_btn = PushButton("📁")
+        exe_btn = PushButton("📄")
         exe_btn.clicked.connect(self._browse_exe)
         exe_row.addWidget(self.exe_edit, 1)
         exe_row.addWidget(exe_btn)
