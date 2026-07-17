@@ -131,7 +131,7 @@ class SahiInferPanel(QWidget):
             lambda v: set_str("sahi_model_type", v)
         )
 
-        model_btn = PushButton("📁")
+        model_btn = PushButton("📄")
         model_btn.clicked.connect(self._browse_model)
         model_row.addWidget(self.model_edit, 1)
         model_row.addWidget(self.model_type_combo)
@@ -222,7 +222,7 @@ class SahiInferPanel(QWidget):
         layout.addWidget(infer_card)
 
         # ---- 输入 / 输出 ----
-        layout.addWidget(StrongBodyLabel("输入 / 输出"))
+        layout.addWidget(StrongBodyLabel("目录设置"))
         io_card = CardWidget()
         io_form = QFormLayout(io_card)
 
@@ -241,7 +241,7 @@ class SahiInferPanel(QWidget):
         folder_btn.setToolTip("选择文件夹")
         folder_btn.clicked.connect(self._browse_folder)
         in_row.addWidget(folder_btn)
-        io_form.addRow(BodyLabel("输入:"), in_row)
+        io_form.addRow(BodyLabel("推理图片:"), in_row)
 
         # 输出
         out_row = QHBoxLayout()
@@ -251,7 +251,7 @@ class SahiInferPanel(QWidget):
         out_btn.clicked.connect(self._browse_output)
         out_row.addWidget(self.output_edit, 1)
         out_row.addWidget(out_btn)
-        io_form.addRow(BodyLabel("输出:"), out_row)
+        io_form.addRow(BodyLabel("保存目录:"), out_row)
 
         # 输出选项
         opt_row = QHBoxLayout()

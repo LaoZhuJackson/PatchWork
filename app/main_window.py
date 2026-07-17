@@ -9,6 +9,7 @@ from qfluentwidgets import (
 from qfluentwidgets import FluentIcon as FIF
 
 from app.utils.config import get_str, set_str
+from app.widgets.benchmark import BenchmarkPanel
 from app.widgets.dataset_split import DatasetSplitPanel
 from app.widgets.export_onnx import ExportONNXPanel
 from app.widgets.gpu_monitor import GPUMonitorPanel
@@ -37,6 +38,7 @@ class MainWindow(FluentWindow):
             "gpu_monitor": GPUMonitorPanel(),
             "xanylabeling": XAnyLabelingPanel(),
             "sahi_infer": SahiInferPanel(),
+            "benchmark": BenchmarkPanel(),
         }
 
         for name, widget in self._placeholder.items():
@@ -85,6 +87,11 @@ class MainWindow(FluentWindow):
         self.addSubInterface(
             self._placeholder["sahi_infer"],
             FIF.ZOOM, "SAHI 推理",
+            position=NavigationItemPosition.TOP,
+        )
+        self.addSubInterface(
+            self._placeholder["benchmark"],
+            FIF.ALBUM, "推理对比",
             position=NavigationItemPosition.TOP,
         )
         self.addSubInterface(
