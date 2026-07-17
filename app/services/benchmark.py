@@ -8,8 +8,11 @@ import numpy as np
 from app.adapters.base import InferenceAdapter
 from app.services.label_reader import IMAGE_EXTS, parse_yolo_label
 from app.services.metrics import evaluate
+from app.utils.logger import get_logger
 from app.utils.worker import Worker
 
+
+logger = get_logger(__name__)
 
 class BenchmarkRunner(Worker):
     """对比多种推理方式的 Worker"""
@@ -88,4 +91,5 @@ class BenchmarkRunner(Worker):
               "time": round(elapsed, 1),
             })
 
+        logger.info(results)
         return results
