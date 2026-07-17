@@ -1,6 +1,8 @@
 """后台 Worker 基类"""
 from __future__ import annotations
 
+import traceback
+
 from PySide6.QtCore import QThread, Signal
 
 class Worker(QThread):
@@ -21,6 +23,6 @@ class Worker(QThread):
         try:
             result = self.do_work()
             self.finished.emit(result)
-        except Exception as e:
-            self.error.emit(str(e))
+        except Exception:
+            self.error.emit(traceback.format_exc())
             
