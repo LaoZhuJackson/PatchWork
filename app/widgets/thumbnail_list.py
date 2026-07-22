@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from qfluentwidgets import qconfig, Theme
 
 THUMB_SIZE = QSize(100, 80)
 BATCH_SIZE = 40
@@ -65,7 +66,6 @@ class ThumbnailList(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         self._list = QListWidget()
-        self._list.setStyleSheet("QListWidget { background: transparent; }")
         self._list.setFlow(QListWidget.Flow.LeftToRight)
         self._list.setViewMode(QListWidget.ViewMode.IconMode)
         self._list.setIconSize(THUMB_SIZE)
@@ -80,6 +80,10 @@ class ThumbnailList(QWidget):
         self._list.wheelEvent = self._wheel_event
 
         layout.addWidget(self._list)
+
+        # 主题感知的文字颜色
+        self._update_list_style()
+        qconfig.themeChanged.connect(self._update_list_style)
 
     # ---- 公共 API ----
 
@@ -122,6 +126,15 @@ class ThumbnailList(QWidget):
         return None
 
     # ---- 内部 ----
+
+    def _update_list_style(self) -> None:
+        """根据当前主题设置列表项颜色"""
+        is_dark = qconfig.theme == Theme.DARK
+        color = "#ffffff" if is_dark else "#000000"
+        self._list.setStyleSheet(
+            f"QListWidget {{ background: transparent; }}"
+            f"QListWidget::item {{ color: {color}; }}"
+        )
 
     def _cancel_loader(self) -> None:
         self._debounce.stop()
