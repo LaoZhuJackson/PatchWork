@@ -13,8 +13,10 @@ from app.widgets.benchmark import BenchmarkPanel
 from app.widgets.dataset_split import DatasetSplitPanel
 from app.widgets.export_onnx import ExportONNXPanel
 from app.widgets.gpu_monitor import GPUMonitorPanel
+from app.widgets.home_panel import HomePanel
 from app.widgets.label_preview import LabelPreviewPanel
 from app.widgets.model_infer import ModelInferPanel
+from app.widgets.ndjson_convert import NDJSONConvertPanel
 from app.widgets.open_vocab_detect import OpenVocabDetectPanel
 from app.widgets.sahi_infer import SahiInferPanel
 from app.widgets.video_extract import VideoExtractPanel
@@ -31,6 +33,7 @@ class MainWindow(FluentWindow):
         self.navigationInterface.setExpandWidth(160)
 
         self._placeholder = {
+            "home": HomePanel(),
             "dataset_split": DatasetSplitPanel(),
             "model_infer": ModelInferPanel(),
             "label_preview": LabelPreviewPanel(),
@@ -40,7 +43,8 @@ class MainWindow(FluentWindow):
             "xanylabeling": XAnyLabelingPanel(),
             "sahi_infer": SahiInferPanel(),
             "benchmark": BenchmarkPanel(),
-            "open_vocab_detect": OpenVocabDetectPanel()
+            "open_vocab_detect": OpenVocabDetectPanel(),
+            "ndjson_convert": NDJSONConvertPanel(),
         }
 
         for name, widget in self._placeholder.items():
@@ -65,7 +69,17 @@ class MainWindow(FluentWindow):
     def _register_navigation(self) -> None:
         """注册导航项和子页面"""
 
+        self.addSubInterface(
+            self._placeholder["home"],
+            FIF.HOME, "首页",
+            position=NavigationItemPosition.TOP,
+        )
         # ----- 导航栏上半区（功能入口） -----
+        self.addSubInterface(
+            self._placeholder["ndjson_convert"],
+            FIF.DOCUMENT, "NDJSON转换",
+            position=NavigationItemPosition.TOP,
+        )
         self.addSubInterface(
             self._placeholder["video_extract"],
             FIF.MEDIA, "视频抽帧",
