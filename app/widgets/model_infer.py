@@ -5,7 +5,6 @@ from pathlib import Path
 
 from PySide6.QtWidgets import (
     QDoubleSpinBox,
-    QFileDialog,
     QHBoxLayout,
     QVBoxLayout,
     QWidget,
@@ -21,6 +20,7 @@ from app.utils.config import get_str, set_str, set_float, get_float
 from app.utils.message import error
 from app.utils.worker import Worker
 from app.widgets.image_browser import ImageBrowser
+from app.widgets.path_browser import PathBrowser
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -88,30 +88,25 @@ class ModelInferPanel(QWidget):
         toolbar.setContentsMargins(12, 8, 12, 8)
         toolbar.setSpacing(8)
 
-        model_row = QHBoxLayout()
+        # 模型文件
+        self.model_browser = PathBrowser(
+            label="模型文件:",
+            mode="file",
+            file_filter="Model Files (*.pt *.pth);;All Files (*)",
+            placeholder="选择 YOLO .pt 模型文件...",
+            config_key="infer_model_path",
+        )
+        self.model_browser.path_changed.connect(self._load_model)
+        toolbar.addWidget(self.model_browser)
 
-        model_row.addWidget(BodyLabel("模型目录:"))
-        self.model_edit = LineEdit()
-        self.model_edit.setPlaceholderText("选择 YOLO .pt 模型文件...")
-        self.model_edit.setReadOnly(True)
-        model_row.addWidget(self.model_edit, 1)
-
-        model_btn = PushButton("📄")
-        model_btn.clicked.connect(self._browse_model)
-        model_row.addWidget(model_btn)
-        toolbar.addLayout(model_row)
-
-        img_row = QHBoxLayout()
-        img_row.addWidget(BodyLabel("图片目录:"))
-        self.folder_edit = LineEdit()
-        self.folder_edit.setPlaceholderText("选择图片文件夹...")
-        self.folder_edit.setReadOnly(True)
-        img_row.addWidget(self.folder_edit, 1)
-
-        folder_btn = PushButton("📁")
-        folder_btn.clicked.connect(self._browse_folder)
-        img_row.addWidget(folder_btn)
-        toolbar.addLayout(img_row)
+        # 图片目录
+        self.folder_browser = PathBrowser(
+            label="图片目录:", mode="dir",
+            placeholder="选择图片文件夹...",
+            config_key="infer_folder_path",
+        )
+        self.folder_browser.path_changed.connect(self._on_folder_selected)
+        toolbar.addWidget(self.folder_browser)
 
         # ---- 阈值设置 ----
         threshold_row = QHBoxLayout()
@@ -161,17 +156,6 @@ class ModelInferPanel(QWidget):
 
     # ---- 模型加载 ----
 
-    def _browse_model(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(
-            self, "选择 YOLO 模型", self.model_edit.text(),
-            "Model Files (*.pt *.pth);;All Files (*)"
-        )
-        if not path:
-            return
-        self.model_edit.setText(path)
-        set_str("infer_model_path", path)
-        self._load_model(path)
-
     def _load_model(self, path: str) -> None:
         self.status_label.setText("正在加载模型...")
         self._load_worker = LoadModelWorker(self._engine, path)
@@ -197,15 +181,10 @@ class ModelInferPanel(QWidget):
 
     # ---- 文件夹加载 ----
 
-    def _browse_folder(self) -> None:
-        path = QFileDialog.getExistingDirectory(
-            self, "选择图片文件夹", self.folder_edit.text()
-        )
-        if not path:
-            return
-        self.folder_edit.setText(path)
-        set_str("infer_folder_path", path)
-        self._load_images(Path(path))
+    def _on_folder_selected(self, path: str) -> None:
+        """图片目录选择回调"""
+        if path:
+            self._load_images(Path(path))
 
     def _load_images(self, directory: Path) -> None:
         # 切换文件夹的时候取消推理
@@ -295,8 +274,8 @@ class ModelInferPanel(QWidget):
     # ---- 持久化 ----
 
     def _load_settings(self) -> None:
-        self.model_edit.setText(get_str("infer_model_path"))
-        self.folder_edit.setText(get_str("infer_folder_path"))
+        self.model_browser.path = get_str("infer_model_path")
+        self.folder_browser.path = get_str("infer_folder_path")
         self.conf_spin.setValue(get_float("infer_conf", 0.25))
         self.iou_spin.setValue(get_float("infer_iou", 0.45))
 

@@ -6,7 +6,6 @@ from pathlib import Path
 import numpy as np
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QFileDialog,
     QFormLayout,
     QHBoxLayout,
     QHeaderView,
@@ -27,6 +26,7 @@ from app.adapters.normal_adapter import NormalAdapter
 from app.adapters.sahi_adapter import SahiAdapter
 from app.services.benchmark import BenchmarkRunner
 from app.adapters.tracking_adapter import TrackingAdapter
+from app.widgets.path_browser import PathBrowser
 from app.utils.config import (
     get_str, set_str, get_float, set_float,
     get_int, set_int, get_bool, set_bool, )
@@ -66,38 +66,27 @@ class BenchmarkPanel(QWidget):
         ds_card = CardWidget()
         ds_form = QFormLayout(ds_card)
 
-        mdl_row = QHBoxLayout()
-        self.model_edit = LineEdit()
-        self.model_edit.setPlaceholderText("选择 YOLO .pt 模型...")
-        self.model_edit.setReadOnly(True)
-        self.model_edit.textChanged.connect(lambda v: set_str("bm_model_path", v))
-        mdl_btn = PushButton("📄")
-        mdl_btn.clicked.connect(self._browse_model)
-        mdl_row.addWidget(self.model_edit, 1)
-        mdl_row.addWidget(mdl_btn)
-        ds_form.addRow(BodyLabel("模型文件:"), mdl_row)
+        self.model_browser = PathBrowser(
+            label="", mode="file",
+            file_filter="Model Files (*.pt *.pth);;All Files (*)",
+            placeholder="选择 YOLO .pt 模型...",
+            config_key="bm_model_path",
+        )
+        ds_form.addRow(BodyLabel("模型文件:"), self.model_browser)
 
-        img_row = QHBoxLayout()
-        self.img_edit = LineEdit()
-        self.img_edit.setPlaceholderText("选择图片目录...")
-        self.img_edit.setReadOnly(True)
-        self.img_edit.textChanged.connect(lambda v: set_str("bm_img_dir", v))
-        img_btn = PushButton("📁")
-        img_btn.clicked.connect(lambda: self._browse_dir(self.img_edit))
-        img_row.addWidget(self.img_edit, 1)
-        img_row.addWidget(img_btn)
-        ds_form.addRow(BodyLabel("图片目录:"), img_row)
+        self.img_browser = PathBrowser(
+            label="", mode="dir",
+            placeholder="选择图片目录...",
+            config_key="bm_img_dir",
+        )
+        ds_form.addRow(BodyLabel("图片目录:"), self.img_browser)
 
-        lbl_row = QHBoxLayout()
-        self.lbl_edit = LineEdit()
-        self.lbl_edit.setPlaceholderText("选择 YOLO 标签目录...")
-        self.lbl_edit.setReadOnly(True)
-        self.lbl_edit.textChanged.connect(lambda v: set_str("bm_lbl_dir", v))
-        lbl_btn = PushButton("📁")
-        lbl_btn.clicked.connect(lambda: self._browse_dir(self.lbl_edit))
-        lbl_row.addWidget(self.lbl_edit, 1)
-        lbl_row.addWidget(lbl_btn)
-        ds_form.addRow(BodyLabel("标签目录:"), lbl_row)
+        self.lbl_browser = PathBrowser(
+            label="", mode="dir",
+            placeholder="选择 YOLO 标签目录...",
+            config_key="bm_lbl_dir",
+        )
+        ds_form.addRow(BodyLabel("标签目录:"), self.lbl_browser)
 
         iou_row = QHBoxLayout()
         iou_row.addWidget(BodyLabel("IoU 阈值:"))
@@ -333,30 +322,13 @@ class BenchmarkPanel(QWidget):
         btn.setIcon(FIF.CARE_DOWN_SOLID if visible else FIF.CARE_LEFT_SOLID)
 
     # ============================================================
-    # 路径
-    # ============================================================
-
-    def _browse_model(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(
-            self, "选择 YOLO 模型", self.model_edit.text(),
-            "Model Files (*.pt *.pth);;All Files (*)"
-        )
-        if path:
-            self.model_edit.setText(path)
-
-    def _browse_dir(self, edit: LineEdit) -> None:
-        path = QFileDialog.getExistingDirectory(self, "选择目录", edit.text())
-        if path:
-            edit.setText(path)
-
-    # ============================================================
     # 运行
     # ============================================================
 
     def _on_run(self) -> None:
-        model_path = self.model_edit.text().strip()
-        img_dir = Path(self.img_edit.text().strip())
-        lbl_dir = Path(self.lbl_edit.text().strip())
+        model_path = self.model_browser.path
+        img_dir = Path(self.img_browser.path)
+        lbl_dir = Path(self.lbl_browser.path)
         iou = self.iou_spin.value()
 
         if not model_path or not Path(model_path).is_file():
@@ -529,7 +501,7 @@ class BenchmarkPanel(QWidget):
         if idx >= 0:
             self.track_tracker.setCurrentIndex(idx)
 
-        self.model_edit.setText(get_str("bm_model_path", ""))
-        self.img_edit.setText(get_str("bm_img_dir", ""))
-        self.lbl_edit.setText(get_str("bm_lbl_dir", ""))
+        self.model_browser.path = get_str("bm_model_path", "")
+        self.img_browser.path = get_str("bm_img_dir", "")
+        self.lbl_browser.path = get_str("bm_lbl_dir", "")
         self.iou_spin.setValue(get_float("bm_iou", 0.5))

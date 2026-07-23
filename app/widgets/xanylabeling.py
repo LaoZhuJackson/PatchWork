@@ -5,20 +5,19 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-  QFileDialog,
-  QFormLayout,
-  QHBoxLayout,
-  QVBoxLayout,
-  QWidget,
+    QFormLayout,
+    QVBoxLayout,
+    QWidget,
 )
 from qfluentwidgets import (
-  PushButton, PrimaryPushButton, LineEdit,
-  BodyLabel, StrongBodyLabel, SubtitleLabel, CardWidget,
+    PrimaryPushButton,
+    BodyLabel, StrongBodyLabel, SubtitleLabel, CardWidget,
 )
 
 from app.services.xanylabeling import launch
-from app.utils.config import get_str, set_str
+from app.utils.config import get_str
 from app.utils.message import info, warning, error
+from app.widgets.path_browser import PathBrowser
 
 class XAnyLabelingPanel(QWidget):
     """X-AnyLabeling 启动面板"""
@@ -43,14 +42,13 @@ class XAnyLabelingPanel(QWidget):
         exe_card = CardWidget()
         exe_form = QFormLayout(exe_card)
 
-        exe_row = QHBoxLayout()
-        self.exe_edit = LineEdit()
-        self.exe_edit.setPlaceholderText("选择 X-AnyLabeling.exe ...")
-        exe_btn = PushButton("📄")
-        exe_btn.clicked.connect(self._browse_exe)
-        exe_row.addWidget(self.exe_edit, 1)
-        exe_row.addWidget(exe_btn)
-        exe_form.addRow(BodyLabel("exe 路径:"), exe_row)
+        self.exe_browser = PathBrowser(
+            label="", mode="file",
+            file_filter="Executable Files (*.exe);;All Files (*)",
+            placeholder="选择 X-AnyLabeling.exe ...",
+            config_key="xanylabeling_exe",
+        )
+        exe_form.addRow(BodyLabel("exe 路径:"), self.exe_browser)
 
         layout.addWidget(exe_card)
 
@@ -59,14 +57,12 @@ class XAnyLabelingPanel(QWidget):
         folder_card = CardWidget()
         folder_form = QFormLayout(folder_card)
 
-        folder_row = QHBoxLayout()
-        self.folder_edit = LineEdit()
-        self.folder_edit.setPlaceholderText("选择要加载的数据集文件夹...")
-        folder_btn = PushButton("📁")
-        folder_btn.clicked.connect(self._browse_folder)
-        folder_row.addWidget(self.folder_edit, 1)
-        folder_row.addWidget(folder_btn)
-        folder_form.addRow(BodyLabel("数据集目录:"), folder_row)
+        self.folder_browser = PathBrowser(
+            label="", mode="dir",
+            placeholder="选择要加载的数据集文件夹...",
+            config_key="xanylabeling_folder",
+        )
+        folder_form.addRow(BodyLabel("数据集目录:"), self.folder_browser)
 
         layout.addWidget(folder_card)
 
@@ -78,25 +74,9 @@ class XAnyLabelingPanel(QWidget):
         layout.addStretch()
 
     # ---- 事件 ----
-    def _browse_exe(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(
-            self, "选择 X-AnyLabeling 可执行文件", "", "Executable Files (*.exe);;All Files (*)"
-        )
-        if path:
-            self.exe_edit.setText(path)
-            set_str("xanylabeling_exe", path)
-
-    def _browse_folder(self) -> None:
-        path = QFileDialog.getExistingDirectory(
-            self, "选择数据集文件夹", self.folder_edit.text()
-        )
-        if path:
-            self.folder_edit.setText(path)
-            set_str("xanylabeling_folder", path)
-
     def _on_launch(self) -> None:
-        exe = self.exe_edit.text().strip()
-        folder = self.folder_edit.text().strip()
+        exe = self.exe_browser.path
+        folder = self.folder_browser.path
 
         if not exe or not Path(exe).is_file():
             warning("错误", "请先选择 X-AnyLabeling 可执行文件路径", self)
@@ -115,5 +95,5 @@ class XAnyLabelingPanel(QWidget):
 
     # ---- 持久化 ----
     def _load_settings(self) -> None:
-        self.exe_edit.setText(get_str("xanylabeling_exe", ""))
-        self.folder_edit.setText(get_str("xanylabeling_folder", ""))
+        self.exe_browser.path = get_str("xanylabeling_exe", "")
+        self.folder_browser.path = get_str("xanylabeling_folder", "")

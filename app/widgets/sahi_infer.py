@@ -18,6 +18,7 @@ from qfluentwidgets import (
 )
 
 from app.services.sahi_inference import SahiConfig, SahiInferenceService
+from app.widgets.path_browser import PathBrowser
 from app.services.label_reader import IMAGE_EXTS
 from app.utils.config import get_str, set_str, get_float, set_float, get_int, set_int, get_bool, set_bool
 from app.utils.message import error, info
@@ -244,14 +245,12 @@ class SahiInferPanel(QWidget):
         io_form.addRow(BodyLabel("推理图片:"), in_row)
 
         # 输出
-        out_row = QHBoxLayout()
-        self.output_edit = LineEdit()
-        self.output_edit.setPlaceholderText("选择输出目录...")
-        out_btn = PushButton("📁")
-        out_btn.clicked.connect(self._browse_output)
-        out_row.addWidget(self.output_edit, 1)
-        out_row.addWidget(out_btn)
-        io_form.addRow(BodyLabel("保存目录:"), out_row)
+        self.output_browser = PathBrowser(
+            label="", mode="dir",
+            placeholder="选择输出目录...",
+            config_key="sahi_output",
+        )
+        io_form.addRow(BodyLabel("保存目录:"), self.output_browser)
 
         # 输出选项
         opt_row = QHBoxLayout()
@@ -330,12 +329,6 @@ class SahiInferPanel(QWidget):
         if path:
             self.input_edit.setText(path)
 
-    def _browse_output(self) -> None:
-        path = QFileDialog.getExistingDirectory(self, "选择输出目录", self.output_edit.text())
-        if path:
-            self.output_edit.setText(path)
-            set_str("sahi_output", path)
-
     # ---- 预览 ----
     def _on_preview(self) -> None:
         service = self._build_service()
@@ -387,7 +380,7 @@ class SahiInferPanel(QWidget):
             return
 
         input_path = Path(self.input_edit.text().strip())
-        output_dir = Path(self.output_edit.text().strip())
+        output_dir = Path(self.output_browser.path)
 
         if input_path.is_file():
             images = [input_path]
@@ -460,6 +453,6 @@ class SahiInferPanel(QWidget):
         self.iou_spin.setValue(get_float("sahi_iou", 0.7))
         self.standard_check.setChecked(get_bool("sahi_standard_pred", True))
         self.input_edit.setText(get_str("sahi_input", ""))
-        self.output_edit.setText(get_str("sahi_output", ""))
+        self.output_browser.path = get_str("sahi_output", "")
         self.vis_check.setChecked(get_bool("sahi_save_vis", True))
         self.txt_check.setChecked(get_bool("sahi_save_txt", True))

@@ -4,15 +4,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtWidgets import (
-    QFileDialog,
     QFormLayout,
-    QHBoxLayout,
     QVBoxLayout,
     QWidget,
 )
 from qfluentwidgets import (
-    PushButton,
-    LineEdit,
     BodyLabel,
     StrongBodyLabel,
     SubtitleLabel,
@@ -20,9 +16,10 @@ from qfluentwidgets import (
 )
 
 from app.services.label_reader import IMAGE_EXTS, parse_yolo_label
-from app.utils.config import get_str, set_str
+from app.utils.config import get_str
 from app.utils.message import info
 from app.widgets.image_browser import ImageBrowser
+from app.widgets.path_browser import PathBrowser
 
 
 class LabelPreviewPanel(QWidget):
@@ -50,23 +47,21 @@ class LabelPreviewPanel(QWidget):
         path_card = CardWidget()
         path_form = QFormLayout(path_card)
 
-        img_row = QHBoxLayout()
-        self.img_edit = LineEdit()
-        self.img_edit.setPlaceholderText("选择图片所在的文件夹...")
-        img_btn = PushButton("📁")
-        img_btn.clicked.connect(lambda: self._browse_dir(self.img_edit, "label_preview_img_dir"))
-        img_row.addWidget(self.img_edit, 1)
-        img_row.addWidget(img_btn)
-        path_form.addRow(BodyLabel("图片目录:"), img_row)
+        self.img_browser = PathBrowser(
+            label="", mode="dir",
+            placeholder="选择图片所在的文件夹...",
+            config_key="label_preview_img_dir",
+        )
+        self.img_browser.path_changed.connect(lambda _: self._reload())
+        path_form.addRow(BodyLabel("图片目录:"), self.img_browser)
 
-        lbl_row = QHBoxLayout()
-        self.lbl_edit = LineEdit()
-        self.lbl_edit.setPlaceholderText("选择标签所在的文件夹...")
-        lbl_btn = PushButton("📁")
-        lbl_btn.clicked.connect(lambda: self._browse_dir(self.lbl_edit, "label_preview_lbl_dir"))
-        lbl_row.addWidget(self.lbl_edit, 1)
-        lbl_row.addWidget(lbl_btn)
-        path_form.addRow(BodyLabel("标签目录:"), lbl_row)
+        self.lbl_browser = PathBrowser(
+            label="", mode="dir",
+            placeholder="选择标签所在的文件夹...",
+            config_key="label_preview_lbl_dir",
+        )
+        self.lbl_browser.path_changed.connect(lambda _: self._reload())
+        path_form.addRow(BodyLabel("标签目录:"), self.lbl_browser)
 
         self.info_label = BodyLabel("")
         path_form.addRow(BodyLabel(""), self.info_label)
@@ -80,17 +75,9 @@ class LabelPreviewPanel(QWidget):
 
     # ---- 路径 ----
 
-    def _browse_dir(self, edit: LineEdit, key: str) -> None:
-        path = QFileDialog.getExistingDirectory(self, "选择目录", edit.text())
-        if not path:
-            return
-        edit.setText(path)
-        set_str(key, path)
-        self._reload()
-
     def _reload(self) -> None:
-        img_dir = self.img_edit.text().strip()
-        lbl_dir = self.lbl_edit.text().strip()
+        img_dir = self.img_browser.path
+        lbl_dir = self.lbl_browser.path
 
         img_path = Path(img_dir) if img_dir else None
         lbl_path = Path(lbl_dir) if lbl_dir else None
@@ -156,8 +143,8 @@ class LabelPreviewPanel(QWidget):
     # ---- 持久化 ----
 
     def _load_settings(self) -> None:
-        self.img_edit.setText(get_str("label_preview_img_dir"))
-        self.lbl_edit.setText(get_str("label_preview_lbl_dir"))
+        self.img_browser.path = get_str("label_preview_img_dir")
+        self.lbl_browser.path = get_str("label_preview_lbl_dir")
 
         img_dir = get_str("label_preview_img_dir")
         lbl_dir = get_str("label_preview_lbl_dir")

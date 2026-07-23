@@ -5,7 +5,6 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QFileDialog,
     QFormLayout,
     QHBoxLayout,
     QVBoxLayout,
@@ -18,7 +17,8 @@ from qfluentwidgets import (
 )
 
 from app.services.exporter import ONNXExporter
-from app.utils.config import get_str, set_str, get_bool, set_bool, set_int
+from app.utils.config import get_str, get_bool, set_bool, set_int
+from app.widgets.path_browser import PathBrowser
 from app.utils.message import info, error
 from app.utils.worker import Worker
 
@@ -70,23 +70,20 @@ class ExportONNXPanel(QWidget):
         path_card = CardWidget()
         path_form = QFormLayout(path_card)
 
-        model_row = QHBoxLayout()
-        self.model_edit = LineEdit()
-        self.model_edit.setPlaceholderText("选择 YOLO .pt 模型文件...")
-        model_btn = PushButton("📄")
-        model_btn.clicked.connect(self._browse_model)
-        model_row.addWidget(self.model_edit, 1)
-        model_row.addWidget(model_btn)
-        path_form.addRow(BodyLabel("模型文件:"), model_row)
+        self.model_browser = PathBrowser(
+            label="", mode="file",
+            file_filter="Model Files (*.pt *.pth);;All Files (*)",
+            placeholder="选择 YOLO .pt 模型文件...",
+            config_key="onnx_model_path",
+        )
+        path_form.addRow(BodyLabel("模型文件:"), self.model_browser)
 
-        out_row = QHBoxLayout()
-        self.out_edit = LineEdit()
-        self.out_edit.setPlaceholderText("选择输出目录（留空则保存在模型同级目录）...")
-        out_btn = PushButton("📁")
-        out_btn.clicked.connect(self._browse_out)
-        out_row.addWidget(self.out_edit, 1)
-        out_row.addWidget(out_btn)
-        path_form.addRow(BodyLabel("输出目录:"), out_row)
+        self.out_browser = PathBrowser(
+            label="", mode="dir",
+            placeholder="选择输出目录（留空则保存在模型同级目录）...",
+            config_key="onnx_output_dir",
+        )
+        path_form.addRow(BodyLabel("输出目录:"), self.out_browser)
 
         layout.addWidget(path_card)
 
@@ -140,30 +137,13 @@ class ExportONNXPanel(QWidget):
         layout.addStretch()
 
     # ---- 事件 ----
-    def _browse_model(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(
-            self, "选择 YOLO 模型", self.model_edit.text(),
-            "Model Files (*.pt *.pth);;All Files (*)"
-        )
-        if path:
-            self.model_edit.setText(path)
-            set_str("onnx_model_path", path)
-
-    def _browse_out(self) -> None:
-        path = QFileDialog.getExistingDirectory(
-            self, "选择输出目录", self.out_edit.text()
-        )
-        if path:
-            self.out_edit.setText(path)
-            set_str("onnx_output_dir", path)
-
     def _on_export(self) -> None:
-        model = self.model_edit.text().strip()
+        model = self.model_browser.path
         if not model or not Path(model).is_file():
             error("错误", "请选择有效的模型文件", self)
             return
 
-        out = self.out_edit.text().strip()
+        out = self.out_browser.path
         simplify = self.simplify_check.isChecked()
         dynamic = self.dynamic_check.isChecked()
         imgsz = self.imgsz_spin.value()
@@ -193,7 +173,7 @@ class ExportONNXPanel(QWidget):
 
     # ---- 持久化 ----
     def _load_settings(self) -> None:
-        self.model_edit.setText(get_str("onnx_model_path"))
-        self.out_edit.setText(get_str("onnx_output_dir"))
+        self.model_browser.path = get_str("onnx_model_path")
+        self.out_browser.path = get_str("onnx_output_dir")
         self.simplify_check.setChecked(get_bool("onnx_simplify", True))
         self.dynamic_check.setChecked(get_bool("onnx_dynamic", True))
