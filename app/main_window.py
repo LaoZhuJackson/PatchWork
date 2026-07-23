@@ -15,6 +15,7 @@ from app.widgets.export_onnx import ExportONNXPanel
 from app.widgets.gpu_monitor import GPUMonitorPanel
 from app.widgets.label_preview import LabelPreviewPanel
 from app.widgets.model_infer import ModelInferPanel
+from app.widgets.open_vocab_detect import OpenVocabDetectPanel
 from app.widgets.sahi_infer import SahiInferPanel
 from app.widgets.video_extract import VideoExtractPanel
 from app.widgets.xanylabeling import XAnyLabelingPanel
@@ -39,6 +40,7 @@ class MainWindow(FluentWindow):
             "xanylabeling": XAnyLabelingPanel(),
             "sahi_infer": SahiInferPanel(),
             "benchmark": BenchmarkPanel(),
+            "open_vocab_detect": OpenVocabDetectPanel()
         }
 
         for name, widget in self._placeholder.items():
@@ -77,6 +79,11 @@ class MainWindow(FluentWindow):
         self.addSubInterface(
             self._placeholder["gpu_monitor"],
             FIF.IOT, "GPU监控",
+            position=NavigationItemPosition.TOP,
+        )
+        self.addSubInterface(
+            self._placeholder["open_vocab_detect"],
+            FIF.TAG, "开放词汇检测",
             position=NavigationItemPosition.TOP,
         )
         self.addSubInterface(
