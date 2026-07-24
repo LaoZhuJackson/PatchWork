@@ -488,6 +488,15 @@ class OpenVocabDetectPanel(QWidget):
         if custom_path:
             self.custom_model_browser.path = custom_path
 
+        # 启动时预加载模型
+        idx = self.model_combo.currentIndex()
+        if 0 <= idx < len(YOLOE_VARIANT_NAMES):
+            # 预设 YOLOE 变体
+            self._load_model(YOLOE_VARIANTS[YOLOE_VARIANT_NAMES[idx]])
+        elif idx == len(YOLOE_VARIANT_NAMES) and custom_path:
+            # 上次选了"自定义模型..."
+            self._load_model(custom_path)
+
         # 图片目录
         saved_folder = get_str("ovd_folder_path")
         if saved_folder:
