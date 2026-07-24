@@ -289,7 +289,7 @@ class OpenVocabDetectPanel(QWidget):
 
     def _do_set_prompts(self, text: str) -> None:
         """解析文本提示并注入模型"""
-        class_names = [name.strp() for name in text.split(",") if name.strip()]
+        class_names = [name.strip() for name in text.split(",") if name.strip()]
         if not class_names:
             error("提示词为空", "请输入至少一个目标描述", self)
             return
