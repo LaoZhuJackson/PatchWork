@@ -271,6 +271,17 @@ class DatasetSplitPanel(QWidget):
         set_int("split_val", v)
         set_int("split_test", s)
 
+    def _set_inputs_enabled(self, enabled: bool) -> None:
+        """分割期间禁用所有输入控件"""
+        self.img_edit.setEnabled(enabled)
+        self.lbl_edit.setEnabled(enabled)
+        self.out_edit.setEnabled(enabled)
+        self.check_btn.setEnabled(enabled)
+        self.move_checkbox.setEnabled(enabled)
+        self.train_slider.setEnabled(enabled)
+        self.val_slider.setEnabled(enabled)
+        self.test_slider.setEnabled(enabled)
+
     def _load_settings(self):
         self.img_edit.setText(get_str("img_dir"))
         self.lbl_edit.setText(get_str("lbl_dir"))
@@ -330,6 +341,7 @@ class DatasetSplitPanel(QWidget):
         total = t + v + s
 
         self.split_btn.setEnabled(False)
+        self._set_inputs_enabled(False)
         self.progress.setVisible(True)
         self.progress.setValue(0)
 
@@ -340,6 +352,7 @@ class DatasetSplitPanel(QWidget):
         self._worker.start()
 
     def _on_finished(self, result: dict) -> None:
+        self._set_inputs_enabled(True)
         self.progress.setValue(100)
         self.split_btn.setEnabled(True)
 
@@ -371,6 +384,7 @@ class DatasetSplitPanel(QWidget):
         self.progress.setVisible(False)
 
     def _on_error(self, err: str) -> None:
+        self._set_inputs_enabled(True)
         self.split_btn.setEnabled(True)
         self.progress.setVisible(False)
         error("错误", f"划分失败:\n{err}", self)

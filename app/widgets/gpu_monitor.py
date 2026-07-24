@@ -333,6 +333,7 @@ class GPUMonitorPanel(QWidget):
             self._worker = HttpWorker(api_url, self.token_edit.text().strip())
 
         self.refresh_btn.setEnabled(False)
+        self._set_inputs_enabled(False)
         self.progress.setVisible(True)
         self.progress.setValue(0)
         self.status_label.setText("正在连接...")
@@ -342,12 +343,14 @@ class GPUMonitorPanel(QWidget):
         self._worker.start()
 
     def _on_finished(self, gpus: list[GPUInfo]) -> None:
+        self._set_inputs_enabled(True)
         self.refresh_btn.setEnabled(True)
         self.progress.setVisible(False)
         self.status_label.setText(f"共 {len(gpus)} 张 GPU")
         self._build_cards(gpus)
 
     def _on_error(self, err_msg: str) -> None:
+        self._set_inputs_enabled(True)
         self.refresh_btn.setEnabled(True)
         self.progress.setVisible(False)
         self.status_label.setText("❌ 连接失败")
@@ -413,6 +416,23 @@ class GPUMonitorPanel(QWidget):
     # ============================================================
     # 持久化
     # ============================================================
+
+    def _set_inputs_enabled(self, enabled: bool) -> None:
+        """刷新期间禁用所有输入控件"""
+        self.smi_radio.setEnabled(enabled)
+        self.gpustat_radio.setEnabled(enabled)
+        self.http_radio.setEnabled(enabled)
+        self.host_edit.setEnabled(enabled)
+        self.port_spin.setEnabled(enabled)
+        self.user_edit.setEnabled(enabled)
+        self.key_edit.setEnabled(enabled)
+        self.pwd_edit.setEnabled(enabled)
+        self.nvsmi_cmd_edit.setEnabled(enabled)
+        self.conda_path_edit.setEnabled(enabled)
+        self.conda_env_edit.setEnabled(enabled)
+        self.gpustat_cmd_edit.setEnabled(enabled)
+        self.url_edit.setEnabled(enabled)
+        self.token_edit.setEnabled(enabled)
 
     def _load_settings(self) -> None:
         # SSH 通用

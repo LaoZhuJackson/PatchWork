@@ -104,6 +104,7 @@ class NDJSONConvertPanel(QWidget):
         Path(output_dir).mkdir(parents=True, exist_ok=True)
 
         self.convert_btn.setEnabled(False)
+        self._set_inputs_enabled(False)
         self.progress.setVisible(True)
         self.progress.setValue(0)
         self.status_label.setText("正在转换...")
@@ -114,6 +115,7 @@ class NDJSONConvertPanel(QWidget):
         self._worker.start()
 
     def _on_done(self, yaml_path: str) -> None:
+        self._set_inputs_enabled(True)
         self.progress.setValue(100)
         self.status_label.setText(f"✅ 转换完成")
         self.convert_btn.setEnabled(True)
@@ -125,12 +127,18 @@ class NDJSONConvertPanel(QWidget):
             self,
         )
     def _on_error(self, err:str) -> None:
+        self._set_inputs_enabled(True)
         self.status_label.setText("❌ 转换失败")
         self.progress.setVisible(False)
         self.convert_btn.setEnabled(True)
         error("转换失败", err,self)
 
     # ---- 持久化 ----
+
+    def _set_inputs_enabled(self, enabled: bool) -> None:
+        """转换期间禁用所有输入控件"""
+        self.ndjson_browser.setEnabled(enabled)
+        self.out_browser.setEnabled(enabled)
 
     def _load_settings(self) -> None:
         self.ndjson_browser.path = get_str("ndjson_input_path")

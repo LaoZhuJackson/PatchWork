@@ -375,6 +375,7 @@ class BenchmarkPanel(QWidget):
             return
 
         self.run_btn.setEnabled(False)
+        self._set_inputs_enabled(False)
         self.progress.setVisible(True)
         self.progress.setValue(0)
         self.status_label.setText("正在对比...")
@@ -386,12 +387,14 @@ class BenchmarkPanel(QWidget):
         self._worker.start()
 
     def _on_finished(self, results: list[dict]) -> None:
+        self._set_inputs_enabled(True)
         self.run_btn.setEnabled(True)
         self.progress.setVisible(False)
         self.status_label.setText("✅ 对比完成")
         self._build_table(results)
 
     def _on_error(self, err_msg: str) -> None:
+        self._set_inputs_enabled(True)
         self.run_btn.setEnabled(True)
         self.progress.setVisible(False)
         self.status_label.setText("❌ 对比失败")
@@ -479,6 +482,16 @@ class BenchmarkPanel(QWidget):
     # ============================================================
     # 持久化
     # ============================================================
+
+    def _set_inputs_enabled(self, enabled: bool) -> None:
+        """运行期间禁用所有输入控件"""
+        self.model_browser.setEnabled(enabled)
+        self.img_browser.setEnabled(enabled)
+        self.lbl_browser.setEnabled(enabled)
+        self.iou_spin.setEnabled(enabled)
+        self.normal_check.setEnabled(enabled)
+        self.sahi_check.setEnabled(enabled)
+        self.track_check.setEnabled(enabled)
 
     def _load_settings(self) -> None:
         self.normal_check.setChecked(get_bool("bm_normal_enabled", True))

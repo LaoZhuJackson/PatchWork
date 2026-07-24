@@ -85,19 +85,19 @@ class VideoExtractPanel(QWidget):
         self.video_edit = LineEdit()
         self.video_edit.setPlaceholderText("选择视频文件...")
         self.video_edit.setReadOnly(True)
-        video_btn = PushButton("📄")
-        video_btn.clicked.connect(self._browse_video)
+        self.video_btn = PushButton("📄")
+        self.video_btn.clicked.connect(self._browse_video)
         video_row.addWidget(self.video_edit, 1)
-        video_row.addWidget(video_btn)
+        video_row.addWidget(self.video_btn)
         path_form.addRow(BodyLabel("视频文件:"), video_row)
 
         out_row = QHBoxLayout()
         self.out_edit = LineEdit()
         self.out_edit.setPlaceholderText("选择输出目录...")
-        out_btn = PushButton("📁")
-        out_btn.clicked.connect(self._browse_out)
+        self.out_btn = PushButton("📁")
+        self.out_btn.clicked.connect(self._browse_out)
         out_row.addWidget(self.out_edit, 1)
-        out_row.addWidget(out_btn)
+        out_row.addWidget(self.out_btn)
         path_form.addRow(BodyLabel("输出目录:"), out_row)
 
         layout.addWidget(path_card)
@@ -288,6 +288,7 @@ class VideoExtractPanel(QWidget):
         self.progress.setVisible(True)
         self.progress.setValue(0)
         self.status_label.setText("正在抽帧...")
+        self._set_inputs_enabled(False)
 
         self._worker = ExtractWorker(video, out, mode, interval, fmt)
         self._worker.finished.connect(self._on_finished)
@@ -295,7 +296,19 @@ class VideoExtractPanel(QWidget):
         self._worker.progress.connect(self.progress.setValue)
         self._worker.start()
 
+    def _set_inputs_enabled(self, enabled: bool) -> None:
+        """抽帧期间禁用输入控件，防止嵌套对话框"""
+        self.video_edit.setEnabled(enabled)
+        self.video_btn.setEnabled(enabled)
+        self.out_edit.setEnabled(enabled)
+        self.out_btn.setEnabled(enabled)
+        self.time_radio.setEnabled(enabled)
+        self.frame_radio.setEnabled(enabled)
+        self.interval_spin.setEnabled(enabled)
+        self.fmt_combo.setEnabled(enabled)
+
     def _on_finished(self, result: dict) -> None:
+        self._set_inputs_enabled(True)
         self.extract_btn.setEnabled(True)
         self.progress.setVisible(False)
         self.status_label.setText(
@@ -312,6 +325,7 @@ class VideoExtractPanel(QWidget):
         )
 
     def _on_error(self, err_msg: str) -> None:
+        self._set_inputs_enabled(True)
         self.extract_btn.setEnabled(True)
         self.progress.setVisible(False)
         self.status_label.setText("❌ 抽帧失败")

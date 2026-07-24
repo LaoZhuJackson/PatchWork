@@ -158,12 +158,21 @@ class ModelInferPanel(QWidget):
 
     def _load_model(self, path: str) -> None:
         self.status_label.setText("正在加载模型...")
+        self._set_inputs_enabled(False)
         self._load_worker = LoadModelWorker(self._engine, path)
         self._load_worker.finished.connect(self._on_model_loaded)
         self._load_worker.error.connect(self._on_model_error)
         self._load_worker.start()
 
+    def _set_inputs_enabled(self, enabled: bool) -> None:
+        self.model_browser.setEnabled(enabled)
+        self.folder_browser.setEnabled(enabled)
+        self.conf_spin.setEnabled(enabled)
+        self.iou_spin.setEnabled(enabled)
+        self.reinfer_btn.setEnabled(enabled)
+
     def _on_model_loaded(self, path: str) -> None:
+        self._set_inputs_enabled(True)
         names = self._engine.class_names
         task = self._engine.task
         count = len(names)
@@ -176,6 +185,7 @@ class ModelInferPanel(QWidget):
             self._run_inference()
 
     def _on_model_error(self, err: str) -> None:
+        self._set_inputs_enabled(True)
         self.status_label.setText("❌ 模型加载失败")
         error("模型加载失败", err, self)
 
@@ -248,6 +258,7 @@ class ModelInferPanel(QWidget):
         self._update_ui_state()
 
     def _on_infer_error(self, err: str) -> None:
+        self._set_inputs_enabled(True)
         self.status_label.setText("❌ 推理失败")
         error("推理失败", err, self)
         self._inferring = False

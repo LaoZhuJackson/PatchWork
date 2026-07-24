@@ -149,6 +149,7 @@ class ExportONNXPanel(QWidget):
         imgsz = self.imgsz_spin.value()
 
         self.export_btn.setEnabled(False)
+        self._set_inputs_enabled(False)
         self.progress.setVisible(True)
         self.progress.setValue(0)
         self.status_label.setText("正在导出...")
@@ -160,18 +161,28 @@ class ExportONNXPanel(QWidget):
         self._worker.start()
 
     def _on_finished(self, export_path: Path) -> None:
+        self._set_inputs_enabled(True)
         self.export_btn.setEnabled(True)
         self.progress.setVisible(False)
         self.status_label.setText(f"✅ 导出成功: {export_path}")
         info("导出完成", f"ONNX 模型已保存到:\n{export_path}", self)
 
     def _on_error(self, err_msg: str) -> None:
+        self._set_inputs_enabled(True)
         self.export_btn.setEnabled(True)
         self.progress.setVisible(False)
         self.status_label.setText("❌ 导出失败")
         error("导出失败", err_msg, self)
 
     # ---- 持久化 ----
+    def _set_inputs_enabled(self, enabled: bool) -> None:
+        """导出期间禁用所有输入控件"""
+        self.model_browser.setEnabled(enabled)
+        self.out_browser.setEnabled(enabled)
+        self.imgsz_spin.setEnabled(enabled)
+        self.simplify_check.setEnabled(enabled)
+        self.dynamic_check.setEnabled(enabled)
+
     def _load_settings(self) -> None:
         self.model_browser.path = get_str("onnx_model_path")
         self.out_browser.path = get_str("onnx_output_dir")

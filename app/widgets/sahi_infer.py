@@ -347,14 +347,31 @@ class SahiInferPanel(QWidget):
 
         self.status_label.setText("正在加载模型并推理...")
         self.preview_btn.setEnabled(False)
+        self._set_inputs_enabled(False)
 
         self._worker = SahiInferWorker(service, input_path)
         self._worker.finished.connect(self._on_preview_done)
         self._worker.error.connect(self._on_error)
         self._worker.start()
 
+    def _set_inputs_enabled(self, enabled: bool) -> None:
+        self.model_edit.setEnabled(enabled)
+        self.model_type_combo.setEnabled(enabled)
+        self.input_edit.setEnabled(enabled)
+        self.output_browser.setEnabled(enabled)
+        self.slice_w_spin.setEnabled(enabled)
+        self.slice_h_spin.setEnabled(enabled)
+        self.overlap_w_spin.setEnabled(enabled)
+        self.overlap_h_spin.setEnabled(enabled)
+        self.conf_spin.setEnabled(enabled)
+        self.iou_spin.setEnabled(enabled)
+        self.standard_check.setEnabled(enabled)
+        self.vis_check.setEnabled(enabled)
+        self.txt_check.setEnabled(enabled)
+        self.batch_btn.setEnabled(enabled)
+
     def _on_preview_done(self, annotations):
-        self.preview_btn.setEnabled(True)
+        self._set_inputs_enabled(True)
 
         input_path = Path(self.input_edit.text().strip())
         if input_path.is_file():
@@ -398,6 +415,7 @@ class SahiInferPanel(QWidget):
 
         self.batch_btn.setEnabled(False)
         self.preview_btn.setEnabled(False)
+        self._set_inputs_enabled(False)
         self.progress.setVisible(True)
         self.progress.setValue(0)
         self.status_label.setText(f"批量推理 {len(images)} 张...")
@@ -415,6 +433,7 @@ class SahiInferPanel(QWidget):
         self._worker.start()
 
     def _on_batch_done(self, result: dict) -> None:
+        self._set_inputs_enabled(True)
         total = result["total"]
         self._all_annotations = result["annotations"]
 
@@ -434,6 +453,7 @@ class SahiInferPanel(QWidget):
         self.browser.show_annotations(anns)
 
     def _on_error(self, err_msg: str) -> None:
+        self._set_inputs_enabled(True)
         self.preview_btn.setEnabled(True)
         self.batch_btn.setEnabled(True)
         self.progress.setVisible(False)

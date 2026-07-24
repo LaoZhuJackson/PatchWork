@@ -245,12 +245,27 @@ class OpenVocabDetectPanel(QWidget):
     def _load_model(self, model_name_or_path: str) -> None:
         """后台加载模型（支持自动下载）"""
         self.status_label.setText(f"正在加载模型: {model_name_or_path} ...")
+        self._set_inputs_enabled(False)
         self._load_worker = LoadYOLOEWorker(self._engine, model_name_or_path)
         self._load_worker.finished.connect(self._on_model_loaded)
         self._load_worker.error.connect(self._on_model_error)
         self._load_worker.start()
 
+    def _set_inputs_enabled(self, enabled: bool) -> None:
+        self.model_combo.setEnabled(enabled)
+        self.custom_model_browser.setEnabled(enabled)
+        self.prompt_edit.setEnabled(enabled)
+        self.apply_prompt_btn.setEnabled(enabled)
+        self.saved_prompt_combo.setEnabled(enabled)
+        self.save_prompt_btn.setEnabled(enabled)
+        self.delete_prompt_btn.setEnabled(enabled)
+        self.folder_browser.setEnabled(enabled)
+        self.conf_spin.setEnabled(enabled)
+        self.iou_spin.setEnabled(enabled)
+        self.reinfer_btn.setEnabled(enabled)
+
     def _on_model_loaded(self, path: str) -> None:
+        self._set_inputs_enabled(True)
         logger.info(f"YOLOE 模型已加载: {path}")
 
         # 恢复历史提示词
@@ -269,6 +284,7 @@ class OpenVocabDetectPanel(QWidget):
             self._run_inference()
 
     def _on_model_error(self, err: str) -> None:
+        self._set_inputs_enabled(True)
         self.status_label.setText("❌ 模型加载失败")
         error("模型加载失败", err, self)
 
@@ -420,6 +436,7 @@ class OpenVocabDetectPanel(QWidget):
             self._infer_worker.wait(3000)
 
         self._inferring = True
+        self._set_inputs_enabled(False)
         self._update_ui_state()
         self.status_label.setText(f"正在推理: {path.name} ...")
 
@@ -440,9 +457,11 @@ class OpenVocabDetectPanel(QWidget):
             f"提示词: {', '.join(self._engine.class_names)}"
         )
         self._inferring = False
+        self._set_inputs_enabled(True)
         self._update_ui_state()
 
     def _on_infer_error(self, err: str) -> None:
+        self._set_inputs_enabled(True)
         self.status_label.setText("❌ 推理失败")
         error("推理失败", err, self)
         self._inferring = False
