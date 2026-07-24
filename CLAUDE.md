@@ -10,7 +10,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Python >= 3.10** (conda env `patchwork`)
 - **GUI**: PySide6 + QFluentWidgets (`PySide6-Fluent-Widgets`), FluentWindow navigation, light/dark theme toggle
-- **ML**: ultralytics (YOLO) + supervision; also SAHI (`sahi`) for sliced inference
+- **ML**: ultralytics (YOLO/YOLOE) + supervision; also SAHI (`sahi`) for sliced inference
+- **Text encoding**: mobileclip (auto-installed by ultralytics for YOLOE)
 - **Video**: opencv-python (video extract, video tracking)
 - **SSH**: paramiko (GPU monitor)
 - **Packaging**: PyInstaller
@@ -38,9 +39,11 @@ app/
 │   ├── sahi_adapter.py     # wraps SahiInferenceService
 │   └── tracking_adapter.py # wraps YOLO model.track()
 ├── widgets/                # one QWidget panel per feature; mutually independent
+│   ├── home_panel.py       # home page: banner + module cards
 │   ├── image_viewer.py     # QGraphicsView: zoom, pan, bbox/polygon/text overlays
 │   ├── thumbnail_list.py   # horizontal lazy-loading thumbnail strip (background thread)
 │   ├── image_browser.py    # composable: ThumbnailList + ImageViewer + nav buttons
+│   ├── path_browser.py     # reusable: label + LineEdit + browse btn (file/dir mode)
 │   ├── dataset_split.py    # F1: pairing check + train/val/test split (copy/move)
 │   ├── model_infer.py      # F2: model load + click-to-infer + conf/iou controls
 │   ├── label_preview.py    # F4: YOLO label overlay preview
@@ -50,10 +53,13 @@ app/
 │   ├── video_extract.py    # F8: extract frames by time/frame interval
 │   ├── sahi_infer.py       # SAHI sliced inference panel
 │   ├── video_track.py      # video tracking panel (BoT-SORT / ByteTrack)
-│   └── benchmark.py        # multi-adapter evaluation + comparison table
+│   ├── benchmark.py        # multi-adapter evaluation + comparison table
+│   ├── open_vocab_detect.py# YOLOE open-vocabulary: text prompts + zero-shot detect
+│   └── ndjson_convert.py   # NDJSON → YOLO format dataset conversion
 ├── services/               # pure logic, no Qt imports; safe from Worker threads
 │   ├── splitter.py         # find_pairs() + split_dataset()
 │   ├── inference.py        # InferenceEngine: detect + seg, conf/iou params
+│   ├── open_vocab.py       # OpenVocabEngine: YOLOE + text prompt encoding
 │   ├── label_reader.py     # parse_yolo_label(), CLASS_COLORS, get_color()
 │   ├── exporter.py         # ONNXExporter wrapping model.export()
 │   ├── gpu_client.py       # fetch_via_nvidia_smi / fetch_via_gpustat / fetch_via_http
@@ -62,6 +68,7 @@ app/
 │   ├── sahi_inference.py   # SahiInferenceService (AutoDetectionModel)
 │   ├── video_tracking.py   # VideoTrackingService (model.track)
 │   ├── benchmark.py        # BenchmarkRunner: iterate adapters × images → per-class metrics
+│   ├── ndjson_converter.py # asyncio wrapper: convert_ndjson_to_yolo()
 │   └── metrics.py          # hand-written IoU matching per class → P/R/F1/AP50
 └── utils/
     ├── worker.py           # Worker(QThread): override do_work(), signals finished/error/progress
@@ -85,6 +92,9 @@ app/
 - **Panels.** Each is a self-contained QWidget with unique `setObjectName()`. Registered in `MainWindow._register_navigation()` via `addSubInterface(self._wrap(widget), ...)`. All panels wrapped in `ScrollArea` — content overflows scroll instead of growing the main window.
 - **QLabel / QPushButton / QListWidget** can stay native — Fluent theme engine auto-styles them. Only use qfluentwidgets-specific controls (`CardWidget`, `BodyLabel`, `CheckBox`, `RadioButton`, `ComboBox`, `Slider`, `SpinBox`, `DoubleSpinBox`, `ScrollArea`, `FluentWindow`) when you need Fluent behavior.
 - **ImageBrowser** (`thumbnail_list.py` + `image_browser.py`) is the shared component for image list + viewer + prev/next buttons. Use it in any panel that browses images.
+- **PathBrowser** (`path_browser.py`) is the reusable file/directory selector. Use `PathBrowser(label="…", mode="file"|"dir", file_filter="…", config_key="…")` instead of manually wiring LineEdit + PushButton + QFileDialog. Connect `path_changed` signal for side effects (model loading, image scanning). Access current path via `.path` property. Set programmatically via `.path = "…"` (no signal emitted).
+- **YOLOE / OpenVocabEngine.** For open-vocabulary detection, use `OpenVocabEngine` (`open_vocab.py`). Flow: `load_model("yoloe-26n-seg.pt")` → `set_prompts(["person", "excavator"])` → `infer("img.jpg")`. `set_prompts()` calls `model.get_text_pe(names)` + `model.set_classes(names, tpe)` to encode text into detection head embeddings. Use non-pf model variants (e.g. `yoloe-26n-seg.pt`, not `-pf`). Text model `mobileclip2:b` auto-downloads on first use.
+- **NDJSON conversion.** `ndjson_converter.py` wraps ultralytics `convert_ndjson_to_yolo()` with `asyncio.run()`. Panel uses Worker pattern for async conversion in background thread.
 
 ## Gotchas
 
@@ -95,3 +105,8 @@ app/
 - **Commits use Conventional Commits** (`fix:`, `feat:`, `refactor:`, etc.).
 - **Theme toggle** uses `addItem(selectable=False, onClick=...)` at NavigationItemPosition.BOTTOM.
 - **GPU monitoring** supports 3 modes selected by RadioButton: nvidia-smi (SSH + CSV), gpustat (SSH + `conda run`), HTTP (Flask API).
+- **YOLOE requires non-pf model.** Open-vocabulary text prompts need `yoloe-*-seg.pt` (NOT `yoloe-*-seg-pf.pt` which is prompt-free and locked to training classes). If `get_text_pe` is missing, the model doesn't support text prompts.
+- **`aiohttp` needed for NDJSON.** The NDJSON converter downloads remote images via aiohttp. Dependency listed in pyproject.toml.
+- **`mobileclip` auto-install.** YOLOE text encoding requires mobileclip; ultralytics auto-downloads it on first `get_text_pe()` call.
+- **PathBrowser config persistence.** When `config_key` is set, PathBrowser auto-saves on browse. Use `path = saved_value` in `_load_settings()` to restore (no signal emitted, unlike browsing).
+- **ThumbnailList item text color.** Theme-aware via `_update_list_style()` connected to `qconfig.themeChanged`. Dark theme → white text, light theme → black text. New list-like widgets should follow the same pattern.

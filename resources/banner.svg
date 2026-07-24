@@ -1,0 +1,56 @@
+<svg width="1200" height="350" viewBox="0 0 1200 350" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- 背景主渐变：深邃的暗夜蓝 -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" /> 
+      <stop offset="50%" stop-color="#1e1b4b" /> 
+      <stop offset="100%" stop-color="#312e81" /> 
+    </linearGradient>
+    
+    <!-- 左侧特征流：冷色调 (可见光/浅蓝) -->
+    <linearGradient id="visGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.6"/> 
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/>
+    </linearGradient>
+    
+    <!-- 右侧特征流：暖色调 (红外/橘红) -->
+    <linearGradient id="irGrad" x1="100%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#fb923c" stop-opacity="0.6"/> 
+      <stop offset="100%" stop-color="#ef4444" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 背景底色 -->
+  <rect width="1200" height="350" fill="url(#bgGrad)" />
+
+  <!-- 左侧视觉元素 -->
+  <circle cx="150" cy="100" r="250" fill="url(#visGrad)" />
+  <polygon points="0,0 450,0 200,350 0,350" fill="url(#visGrad)" opacity="0.4"/>
+
+  <!-- 右侧视觉元素 -->
+  <circle cx="1050" cy="250" r="300" fill="url(#irGrad)" />
+  <polygon points="1200,350 750,350 1000,0 1200,0" fill="url(#irGrad)" opacity="0.4"/>
+
+  <!-- 中央 PatchWork 融合区域 (模拟多头注意力的感受野拼合) -->
+  <g transform="translate(380, 45)">
+    <rect x="0" y="30" width="120" height="120" rx="20" fill="#ffffff" opacity="0.05" />
+    <rect x="80" y="80" width="120" height="120" rx="20" fill="#ffffff" opacity="0.1" />
+    <rect x="160" y="130" width="120" height="120" rx="20" fill="#ffffff" opacity="0.15" />
+    <rect x="240" y="80" width="120" height="120" rx="20" fill="#ffffff" opacity="0.1" />
+    <rect x="320" y="30" width="120" height="120" rx="20" fill="#ffffff" opacity="0.05" />
+    
+    <!-- 神经网络连线/特征点 -->
+    <g stroke="#ffffff" stroke-width="1.5" opacity="0.3">
+      <line x1="60" y1="90" x2="140" y2="140" />
+      <line x1="140" y1="140" x2="220" y2="190" />
+      <line x1="220" y1="190" x2="300" y2="140" />
+      <line x1="300" y1="140" x2="380" y2="90" />
+    </g>
+    
+    <circle cx="60" cy="90" r="4" fill="#ffffff" opacity="0.6"/>
+    <circle cx="140" cy="140" r="4" fill="#ffffff" opacity="0.6"/>
+    <circle cx="220" cy="190" r="5" fill="#ffffff" opacity="0.9"/> <!-- 融合中心点 -->
+    <circle cx="300" cy="140" r="4" fill="#ffffff" opacity="0.6"/>
+    <circle cx="380" cy="90" r="4" fill="#ffffff" opacity="0.6"/>
+  </g>
+</svg>
