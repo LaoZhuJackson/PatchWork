@@ -1,0 +1,90 @@
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- 1. 背景暗夜蓝渐变 (匹配 Banner 背景) -->
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="70%" fx="50%" fy="50%">
+      <stop offset="0%" stop-color="#1e1b4b" />
+      <stop offset="100%" stop-color="#05050a" />
+    </radialGradient>
+
+    <!-- 2. 背景中心环境光 -->
+    <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.25" />
+      <stop offset="100%" stop-color="#8b5cf6" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- 3. 左侧 Stem：冷色数据流 (可见光/浅蓝) -->
+    <linearGradient id="coolGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#2563eb" />
+    </linearGradient>
+
+    <!-- 4. 右侧 Loop：暖色数据流 (红外/橘红) -->
+    <linearGradient id="warmGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f97316" />
+      <stop offset="100%" stop-color="#ef4444" />
+    </linearGradient>
+
+    <!-- 5. 中心节点：融合与计算 (高能紫) -->
+    <linearGradient id="fusionGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e879f9" />
+      <stop offset="100%" stop-color="#9333ea" />
+    </linearGradient>
+    
+    <!-- 6. 科技感网格底纹 -->
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M 32 0 L 0 0 0 32" fill="none" stroke="#ffffff" stroke-width="1" stroke-opacity="0.03" />
+    </pattern>
+  </defs>
+
+  <!-- ================= 背景层 ================= -->
+  <!-- 现代圆角矩形底板 (Squircle) -->
+  <rect width="256" height="256" rx="56" fill="url(#bgGrad)" />
+  <rect width="256" height="256" rx="56" fill="url(#grid)" />
+  <!-- 中心紫色光晕烘托 -->
+  <circle cx="128" cy="128" r="90" fill="url(#glowGrad)" />
+
+  <!-- ================= 几何拼合 "P" 主体 ================= -->
+  <!-- 使用精密的网格坐标体系，所有模块间距保持绝对 8px 的缝隙 -->
+  
+  <g stroke="#ffffff" stroke-width="1.2" stroke-opacity="0.25" stroke-linejoin="round">
+    
+    <!-- 模块 1：左侧支柱 (冷色) 带有内凹卡槽 -->
+    <path d="M 72 48 
+             L 96 48 
+             L 96 88 
+             L 80 104 
+             L 80 112 
+             L 96 128 
+             L 96 208 
+             L 80 208 
+             L 56 184 
+             L 56 64 Z" 
+          fill="url(#coolGrad)" />
+          
+    <!-- 模块 2：右侧外环 (暖色) 带有外凸与平滑包络 -->
+    <path d="M 104 48 
+             L 160 48 
+             L 200 88 
+             L 200 128 
+             L 160 168 
+             L 104 168 
+             L 104 128 
+             L 144 128 
+             L 160 112 
+             L 160 104 
+             L 144 88 
+             L 104 88 Z" 
+          fill="url(#warmGrad)" />
+          
+    <!-- 模块 3：中央节点 (融合色) 完美嵌套于卡槽中 -->
+    <!-- 它是左右色彩和结构的物理桥梁，象征 PatchWork 的核心算法 -->
+    <path d="M 100 96 
+             L 140 96 
+             L 152 108 
+             L 140 120 
+             L 100 120 
+             L 88 108 Z" 
+          fill="url(#fusionGrad)" />
+          
+  </g>
+</svg>

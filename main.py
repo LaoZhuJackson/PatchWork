@@ -41,7 +41,6 @@ def main() -> None:
 
     qt_handler.signal.message.connect(show_log_popup)
 
-    window.show()
     sys.exit(app.exec())
 
 

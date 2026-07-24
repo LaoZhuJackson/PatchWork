@@ -15,6 +15,9 @@ def _setup_scrollable(w: MessageBox, parent=None) -> None:
         screen = QApplication.primaryScreen()
         max_h = int(screen.availableGeometry().height() * 0.85) if screen else 600
 
+    # 内容可选中文
+    w.setContentCopyable(True)
+
     # 去掉 MessageBox 的固定尺寸，改为动态高度（固定尺寸会让长内容撑破屏幕）
     w.widget.setMinimumSize(420, 200)
     w.widget.setMaximumHeight(max_h)

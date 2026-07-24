@@ -19,26 +19,25 @@ from qfluentwidgets import (
     FluentIcon as FIF, isDarkTheme, FlowLayout, IconWidget,
 )
 
-
 # ---- 模块卡片数据 ----
 
 _MODULES = [
     # (图标, 标题, 描述)
-    (FIF.MEDIA,       "视频抽帧",     "按时间或帧间隔从视频提取帧"),
-    (FIF.APPLICATION, "数据集划分",   "图片-标签配对检查 + 训练/验证/测试集划分"),
-    (FIF.DOCUMENT,    "NDJSON转换",   "NDJSON 格式数据集 → YOLO 格式"),
-    (FIF.IOT,         "GPU监控",      "远程 GPU 状态监控"),
-    (FIF.TAG,         "开放词汇检测", "YOLOE 文本提示零样本检测，支持任意类别名"),
-    (FIF.PHOTO,       "模型推理",     "YOLO 模型加载 + 单图推理 + 结果叠加"),
-    (FIF.ZOOM,        "SAHI 推理",    "切片辅助推理，提升小目标检测精度"),
-    (FIF.ALBUM,       "推理对比",     "多推理方式对比评测，输出每类 P/R/F1 表格"),
-    (FIF.SAVE_AS,     "导出ONNX",     ".pt → ONNX 转换"),
-    (FIF.TILES,       "Label预览",    "YOLO 标注文件可视化预览"),
-    (FIF.LINK,        "X-AnyLabeling","一键启动外部标注工具"),
+    (FIF.MEDIA, "视频抽帧", "按时间或帧间隔从视频提取帧"),
+    (FIF.APPLICATION, "数据集划分", "图片-标签配对检查 + 训练/验证/测试集划分"),
+    (FIF.DOCUMENT, "NDJSON转换", "NDJSON 格式数据集 → YOLO 格式"),
+    (FIF.IOT, "GPU监控", "远程 GPU 状态监控"),
+    (FIF.TAG, "开放词汇检测", "YOLOE 文本提示零样本检测，支持任意类别名"),
+    (FIF.PHOTO, "模型推理", "YOLO 模型加载 + 单图推理 + 结果叠加"),
+    (FIF.ZOOM, "SAHI 推理", "切片辅助推理，提升小目标检测精度"),
+    (FIF.ALBUM, "推理对比", "多推理方式对比评测，输出每类 P/R/F1 表格"),
+    (FIF.SAVE_AS, "导出ONNX", ".pt → ONNX 转换"),
+    (FIF.TILES, "Label预览", "YOLO 标注文件可视化预览"),
+    (FIF.LINK, "X-AnyLabeling", "一键启动外部标注工具"),
 ]
 
 _BANNER_PATH = (
-    Path(__file__).resolve().parent.parent.parent / "resources" / "banner.svg"
+        Path(__file__).resolve().parent.parent.parent / "resources" / "banner.png"
 )
 
 _GITHUB_URL = "https://github.com/LaoZhuJackson/PatchWork"
@@ -53,8 +52,8 @@ class _LinkCard(CardWidget):
     """
 
     def __init__(
-        self, icon: FIF, title: str, content: str, url: str,
-        parent: QWidget | None = None,
+            self, icon: FIF, title: str, content: str, url: str,
+            parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._url = QUrl(url)
@@ -144,7 +143,12 @@ class _Banner(QWidget):
 
         # 圆角裁剪路径
         path = QPainterPath()
-        path.addRoundedRect(QRectF(0, 0, w, h), 8, 8)
+        path.setFillRule(Qt.WindingFill)
+        path.addRoundedRect(QRectF(0, 0, w, h), 10, 10)
+        path.addRect(QRectF(0, h - 50, 50, 50))
+        path.addRect(QRectF(w - 50, 0, 50, 50))
+        path.addRect(QRectF(w - 50, h - 50, 50, 50))
+        path = path.simplified()
 
         # 1. SVG 背景图
         if not self._bg.isNull():
@@ -153,34 +157,22 @@ class _Banner(QWidget):
                 Qt.TransformationMode.SmoothTransformation,
             )
             x = (scaled.width() - w) // 2
-            y = (scaled.height() - h) // 2
+            y = scaled.height() - h
             painter.setClipPath(path)
             painter.drawPixmap(-x, -y, scaled)
             painter.setClipping(False)
 
         # 2. 整体遮罩（保证文字可读）
         gradient = QLinearGradient(0, 0, 0, h)
-        if isDarkTheme():
-            gradient.setColorAt(0, QColor(30, 35, 45, 80))
-            gradient.setColorAt(0.6, QColor(20, 22, 28, 160))
-            gradient.setColorAt(1.0, QColor(20, 22, 28, 220))
+        if not isDarkTheme():
+            gradient.setColorAt(0, QColor(207, 216, 228, 255))
+            gradient.setColorAt(1.0, QColor(207, 216, 228, 0))
         else:
-            gradient.setColorAt(0, QColor(255, 255, 255, 40))
-            gradient.setColorAt(0.6, QColor(220, 228, 240, 140))
-            gradient.setColorAt(1.0, QColor(220, 228, 240, 200))
+            gradient.setColorAt(0, QColor(0, 0, 0, 255))
+            gradient.setColorAt(1.0, QColor(0, 0, 0, 0))
         painter.fillPath(path, QBrush(gradient))
 
-        # 3. 底部淡出 — 遮罩从半透明渐变为完全透明，露出下方内容
-        fade = QLinearGradient(0, h - 40, 0, h)
-        fade.setColorAt(0, QColor(0, 0, 0, 0))
-        if isDarkTheme():
-            fade.setColorAt(1, QColor(20, 22, 28, 220))
-        else:
-            fade.setColorAt(1, QColor(220, 228, 240, 200))
-        # 取交集: 只画 banner 底部 40px 的淡出带
-        fade_path = QPainterPath()
-        fade_path.addRect(QRectF(0, h - 40, w, 40))
-        painter.fillPath(path.intersected(fade_path), QBrush(fade))
+        painter.fillPath(path, QBrush(gradient))
 
 
 # ---- 模块卡片 ----
@@ -189,11 +181,12 @@ class _ModuleCard(CardWidget):
     """单个功能模块卡片：图标 + 标题 + 描述"""
 
     def __init__(
-        self, icon: FIF, title: str, desc: str,
-        parent: QWidget | None = None,
+            self, icon: FIF, title: str, desc: str,
+            parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setMinimumWidth(220)
+        self.setMinimumWidth(250)
+        self.setMaximumWidth(250)
         self.setMinimumHeight(100)
 
         layout = QVBoxLayout(self)
@@ -201,8 +194,8 @@ class _ModuleCard(CardWidget):
         layout.setSpacing(6)
 
         header = QHBoxLayout()
-        icon_widget = QLabel()
-        icon_widget.setPixmap(icon.icon().pixmap(24, 24))
+        icon_widget = IconWidget(icon, self)
+        icon_widget.setFixedSize(24, 24)
         header.addWidget(icon_widget)
 
         title_label = StrongBodyLabel(title)
@@ -227,7 +220,7 @@ class HomePanel(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setSpacing(24)
-        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setContentsMargins(24, 24, 0, 24)
 
         # ---- Banner ----
         layout.addWidget(_Banner(self))

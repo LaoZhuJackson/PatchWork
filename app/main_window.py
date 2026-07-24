@@ -1,10 +1,12 @@
 """主窗口：FluentWindow 侧边栏导航 + 页面切换（所有页面包在 ScrollArea 中）"""
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSize
+from PySide6.QtGui import QIcon, QPixmap
+from PySide6.QtWidgets import QApplication
 from qfluentwidgets import (
     FluentWindow, NavigationItemPosition, setTheme, Theme,
-    ScrollArea,
+    ScrollArea, SplashScreen,
 )
 from qfluentwidgets import FluentIcon as FIF
 
@@ -22,12 +24,32 @@ from app.widgets.sahi_infer import SahiInferPanel
 from app.widgets.video_extract import VideoExtractPanel
 from app.widgets.xanylabeling import XAnyLabelingPanel
 
+from pathlib import Path
+
+_ICON_PATH = (
+    Path(__file__).resolve().parent.parent / "resources" / "icon.svg"
+)
 
 class MainWindow(FluentWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("PatchWork")
         self.resize(900, 700)
+
+        self.setWindowIcon(QIcon(QPixmap(str(_ICON_PATH))))
+
+        self.splashScreen = SplashScreen(self.windowIcon(), self)
+        self.splashScreen.setIconSize(QSize(96, 96))
+
+        screen = QApplication.primaryScreen()
+        if screen:
+            rect = screen.availableGeometry()
+            self.move(
+                rect.x() + (rect.width() - self.width()) // 2,
+                rect.y() + (rect.height() - self.height()) // 2,
+            )
+        self.show()
+        QApplication.processEvents()
 
         self.navigationInterface.setReturnButtonVisible(False)
         self.navigationInterface.setExpandWidth(160)
@@ -65,6 +87,14 @@ class MainWindow(FluentWindow):
             self._placeholder[name] = scroll
 
         self._register_navigation()
+
+        # 加载完毕，关闭splash
+        self.splashScreen.finish()
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        if hasattr(self, 'splashScreen') and self.splashScreen.isVisible():
+            self.splashScreen.resize(self.size())
 
     def _register_navigation(self) -> None:
         """注册导航项和子页面"""
