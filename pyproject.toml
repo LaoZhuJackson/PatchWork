@@ -18,6 +18,7 @@ dependencies = [
   "pyyaml",
   "paramiko",
   "sahi",
+  "clip @ git+https://github.com/ultralytics/CLIP.git",
 ]
 
 [project.optional-dependencies]

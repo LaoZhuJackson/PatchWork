@@ -24,7 +24,7 @@ def main() -> None:
     _models_dir = PROJECT_ROOT / "models"
     _models_dir.mkdir(exist_ok=True)
     from ultralytics import settings as ultralytics_settings
-    ultralytics_settings.update({"weights_dir": str(_models_dir)})
+    ultralytics_settings.update(weights_dir=str(_models_dir))
 
     app = QApplication(sys.argv)
     app.setApplicationName("PatchWork")
