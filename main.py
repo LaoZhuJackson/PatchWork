@@ -2,10 +2,39 @@
 from __future__ import annotations
 
 import sys
+import types
 from pathlib import Path
 
 from PySide6.QtWidgets import QApplication
 from qfluentwidgets import setTheme, Theme
+
+# ---- albumentations 1.x → 2.x 兼容 ----
+# 2.0+ 把 transforms 从 albumentations.augmentations.transforms 移走了，
+# 但旧模型 checkpoint 里 pickle 的类路径还在旧位置，torch.load 时会找不到。
+# 这里注入一个 shim 模块，把新位置的类映射回旧路径。
+def _setup_albumentations_shim() -> None:
+    _OLD = "albumentations.augmentations.transforms"
+    if _OLD in sys.modules:
+        return
+    try:
+        __import__(_OLD)
+    except ImportError:
+        import albumentations as A
+        # 注册父模块
+        _parent = "albumentations.augmentations"
+        if _parent not in sys.modules:
+            sys.modules[_parent] = types.ModuleType(_parent)
+        # 创建 shim：从新版导入路径收集所有类名，挂到旧路径
+        _shim = types.ModuleType(_OLD)
+        _shim.__all__ = []
+        for _src in (A, A.core):
+            for _name in dir(_src):
+                if _name and _name[0].isupper():
+                    setattr(_shim, _name, getattr(_src, _name))
+                    _shim.__all__.append(_name)
+        sys.modules[_OLD] = _shim
+
+_setup_albumentations_shim()
 
 from app.main_window import MainWindow
 from app.utils.config import get_str
