@@ -12,6 +12,7 @@ dependencies = [
   "PySide6-Fluent-Widgets",
   "supervision",
   "ultralytics>=8.3.0",
+  "aiohttp",
   "pillow",
   "numpy",
   "pyyaml",
