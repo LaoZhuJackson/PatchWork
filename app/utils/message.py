@@ -15,16 +15,11 @@ def _setup_scrollable(w: MessageBox, parent=None) -> None:
         screen = QApplication.primaryScreen()
         max_h = int(screen.availableGeometry().height() * 0.85) if screen else 600
 
-    # 内容不够长就不干预
-    content_height = w.contentLabel.y() + w.contentLabel.height() + 105
-    if content_height <= max_h:
-        return
-
-    # 去掉固定尺寸限制，改为最大高度
+    # 去掉 MessageBox 的固定尺寸，改为动态高度（固定尺寸会让长内容撑破屏幕）
     w.widget.setMinimumSize(300, 200)
     w.widget.setMaximumHeight(max_h)
 
-    # 把 contentLabel 包装进 QScrollArea
+    # 把 contentLabel 包装进 QScrollArea（无论长短都包，短内容时滚动条不出现）
     scroll = QScrollArea()
     scroll.setWidgetResizable(True)
     scroll.setFrameShape(QScrollArea.Shape.NoFrame)
