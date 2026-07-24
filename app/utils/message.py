@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QScrollArea, QApplication
-from qfluentwidgets import MessageBox
+from qfluentwidgets import MessageBox, ScrollArea
 
 
 def _setup_scrollable(w: MessageBox, parent=None) -> None:
@@ -20,13 +20,13 @@ def _setup_scrollable(w: MessageBox, parent=None) -> None:
     w.widget.setMaximumHeight(max_h)
 
     # 把 contentLabel 包装进 QScrollArea（无论长短都包，短内容时滚动条不出现）
-    scroll = QScrollArea()
+    scroll = ScrollArea()
     scroll.setWidgetResizable(True)
-    scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-    scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-    scroll.setStyleSheet(
-        "QScrollArea { background: transparent; border: none; }"
-    )
+    scroll.setFrameShape(ScrollArea.Shape.NoFrame)
+    scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+    # scroll.setStyleSheet(
+    #     "QScrollArea { background: transparent; border: none; }"
+    # )
 
     # 从 textLayout 中取出 contentLabel，换成 scroll area
     idx = w.textLayout.indexOf(w.contentLabel)

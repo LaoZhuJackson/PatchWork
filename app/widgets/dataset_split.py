@@ -223,17 +223,17 @@ class DatasetSplitPanel(QWidget):
 
         if missing_label:
             lines.append(f"\n━━━ 缺少标签的图片 ({len(missing_label)} 张) ━━━")
-            for f in missing_label[:20]:
+            for f in missing_label:
                 lines.append(f"  ✗ {f.name}")
-            if len(missing_label) > 20:
-                lines.append(f"  ... 等共 {len(missing_label)} 张")
+            # if len(missing_label) > 20:
+            #     lines.append(f"  ... 等共 {len(missing_label)} 张")
 
         if missing_image:
             lines.append(f"\n━━━ 缺少图片的标签 ({len(missing_image)} 个) ━━━")
-            for f in missing_image[:20]:
+            for f in missing_image:
                 lines.append(f"  ✗ {f.name}")
-            if len(missing_image) > 20:
-                lines.append(f"  ... 等共 {len(missing_image)} 个")
+            # if len(missing_image) > 20:
+            #     lines.append(f"  ... 等共 {len(missing_image)} 个")
 
         if not missing_label and not missing_image:
             lines.append("\n🎉 所有图片和标签均配对")
