@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 from PySide6.QtWidgets import QApplication
 from qfluentwidgets import setTheme, Theme
@@ -12,9 +13,18 @@ from app.utils.crash_handler import setup_crash_handler
 from app.utils.logger import setup_logging
 from app.utils.message import error, warning
 
+# 项目根目录
+PROJECT_ROOT = Path(__file__).resolve().parent
+
 
 def main() -> None:
     setup_crash_handler()
+
+    # ---- ultralytics 下载目录统一到项目 models/ ----
+    _models_dir = PROJECT_ROOT / "models"
+    _models_dir.mkdir(exist_ok=True)
+    from ultralytics import settings as ultralytics_settings
+    ultralytics_settings.update({"weights_dir": str(_models_dir)})
 
     app = QApplication(sys.argv)
     app.setApplicationName("PatchWork")

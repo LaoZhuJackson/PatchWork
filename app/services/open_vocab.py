@@ -72,7 +72,7 @@ class OpenVocabEngine:
         self._class_names = []
 
         # 检查是否支持文本提示
-        if not hasattr(self._model_path, "get_text_pe"):
+        if not hasattr(self._model.model, "get_text_pe"):
             raise RuntimeError(
                 f"该模型不支持文本提示（{Path(model_path).name} 可能不是 YOLOE 模型）。\n"
                 "请使用 yoloe-*-seg.pt 而非 -pf 变体。"
