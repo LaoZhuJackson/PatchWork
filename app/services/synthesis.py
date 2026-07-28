@@ -89,9 +89,11 @@ class ImageCompositor:
     """随机贴图合成：把实例库中的目标贴到背景图上
 
     支持：
-    - 两种尺寸模式：比例缩放 / 指定最长边像素
-    - 随机旋转、模糊、亮度微调
-    - 水平/垂直翻转
+    - 尺寸模式：比例缩放 / 指定最长边像素
+    - 色阶模式：白热/黑热/保持原样（自动反色纠正）
+    - 融合模式：Alpha 混合 / 泊松融合（无缝边缘）
+    - 直方图匹配：把实例像素分布对齐到背景区域
+    - 随机旋转、模糊、噪声、翻转
     - 自定义类别 ID
     """
 
@@ -102,11 +104,15 @@ class ImageCompositor:
         size_mode: str = "scale",
         scale_range: tuple[float, float] = (0.5, 1.5),
         pixel_size: int = 0,
+        color_mode: str = "keep",
+        blend_mode: str = "alpha",
+        match_histogram: bool = False,
         rotation_range: tuple[float, float] = (-30, 30),
         blur_range: tuple[float, float] = (0.0, 0.0),
+        noise_range: tuple[float, float] = (0.0, 0.0),
         flip_h_prob: float = 0.0,
         flip_v_prob: float = 0.0,
-        brightness_range: tuple[float, float] = (0.8, 1.2),
+        contrast_range: tuple[float, float] = (0.8, 1.2),
         class_id: int = 0,
     ) -> None:
         self.instances = sorted(instance_dir.glob("*.png"))
@@ -115,11 +121,15 @@ class ImageCompositor:
         self._size_mode = size_mode
         self.scale_range = scale_range
         self._pixel_size = pixel_size
+        self._color_mode = color_mode
+        self._blend_mode = blend_mode
+        self._match_histogram = match_histogram
         self.rotation_range = rotation_range
         self._blur_range = blur_range
+        self._noise_range = noise_range
         self._flip_h_prob = flip_h_prob
         self._flip_v_prob = flip_v_prob
-        self.brightness_range = brightness_range
+        self.contrast_range = contrast_range
         self.class_id = class_id
 
     @property
@@ -142,7 +152,10 @@ class ImageCompositor:
             if instance is None or instance.shape[2] < 4:
                 continue
 
-            # 尺寸：像素模式按最长边算比例，比例模式随机取
+            # ── 色阶模式 ──
+            instance = _apply_color_mode(instance, self._color_mode)
+
+            # ── 尺寸 ──
             if self._size_mode == "pixel" and self._pixel_size > 0:
                 max_dim = max(instance.shape[0], instance.shape[1])
                 scale = self._pixel_size / max_dim
@@ -150,12 +163,13 @@ class ImageCompositor:
                 scale = random.uniform(*self.scale_range)
 
             angle = random.uniform(*self.rotation_range)
-            brightness = random.uniform(*self.brightness_range)
+            contrast = random.uniform(*self.contrast_range)
             blur_sigma = random.uniform(*self._blur_range)
+            noise_sigma = random.uniform(*self._noise_range)
             flip_h = random.random() < self._flip_h_prob
             flip_v = random.random() < self._flip_v_prob
 
-            instance = _augment(instance, scale, angle, brightness,
+            instance = _augment(instance, scale, angle, contrast,
                                 blur_sigma, flip_h, flip_v)
             h_i, w_i = instance.shape[:2]
 
@@ -165,11 +179,41 @@ class ImageCompositor:
             x = random.randint(0, w_t - w_i)
             y = random.randint(0, h_t - h_i)
 
-            # Alpha 混合
-            alpha = instance[:, :, 3:4].astype(np.float32) / 255.0
-            roi = target[y:y + h_i, x:x + w_i].astype(np.float32)
-            fg = instance[:, :, :3].astype(np.float32)
-            target[y:y + h_i, x:x + w_i] = (fg * alpha + roi * (1 - alpha)).astype(np.uint8)
+            # ── 融合 ──
+            alpha = instance[:, :, 3]
+            fg = instance[:, :, :3]
+            roi = target[y:y + h_i, x:x + w_i]
+
+            if self._blend_mode == "poisson":
+                # 泊松融合：需要 mask（alpha>0 的区域）
+                mask = (alpha > 30).astype(np.uint8) * 255
+                center = (x + w_i // 2, y + h_i // 2)
+                try:
+                    # 转为 3 通道灰度供 seamlessClone 用
+                    if roi.ndim == 2:
+                        roi = cv2.cvtColor(roi, cv2.COLOR_GRAY2BGR)
+                    if fg.ndim == 2:
+                        fg = cv2.cvtColor(fg, cv2.COLOR_GRAY2BGR)
+                    target[y:y + h_i, x:x + w_i] = cv2.seamlessClone(
+                        fg, roi, mask, center, cv2.NORMAL_CLONE,
+                    )
+                except cv2.error:
+                    # 泊松融合失败 → 回退 Alpha
+                    self._alpha_blend(target, fg, alpha, x, y, h_i, w_i)
+            else:
+                self._alpha_blend(target, fg, alpha, x, y, h_i, w_i)
+
+            # ── 直方图匹配 ──
+            if self._match_histogram:
+                roi2 = target[y:y + h_i, x:x + w_i]
+                roi2 = _match_histogram_region(roi2, roi)
+                target[y:y + h_i, x:x + w_i] = roi2
+
+            # ── 噪声 ──
+            if noise_sigma > 0:
+                roi3 = target[y:y + h_i, x:x + w_i].astype(np.float32)
+                gauss = np.random.normal(0, noise_sigma, roi3.shape).astype(np.float32)
+                target[y:y + h_i, x:x + w_i] = np.clip(roi3 + gauss, 0, 255).astype(np.uint8)
 
             annotations.append({
                 "class_id": self.class_id,
@@ -183,24 +227,39 @@ class ImageCompositor:
         cv2.imwrite(str(output_path), target)
         return annotations
 
+    @staticmethod
+    def _alpha_blend(
+        target: np.ndarray, fg: np.ndarray, alpha: np.ndarray,
+        x: int, y: int, h: int, w: int,
+    ) -> None:
+        a = alpha.astype(np.float32)[:, :, np.newaxis] / 255.0
+        roi = target[y:y + h, x:x + w].astype(np.float32)
+        fg_f = fg[:, :, :3].astype(np.float32)
+        # 确保 channel 维度对齐
+        if roi.shape[2] == 1:
+            roi = np.repeat(roi, 3, axis=2)
+        if fg_f.shape[2] == 1:
+            fg_f = np.repeat(fg_f, 3, axis=2)
+        target[y:y + h, x:x + w] = (fg_f * a + roi * (1 - a)).astype(np.uint8)
+
 
 def _augment(
     img: np.ndarray,
     scale: float,
     angle: float,
-    brightness: float,
+    contrast: float,
     blur_sigma: float,
     flip_h: bool,
     flip_v: bool,
 ) -> np.ndarray:
-    """缩放 + 翻转 + 旋转 + 模糊 + 亮度调整，保持 RGBA"""
+    """缩放 + 翻转 + 旋转 + 模糊 + 对比度调整，保持 RGBA"""
     result = img.copy()
 
-    # 1. 翻转（不改变 alpha）
+    # 1. 翻转
     if flip_h:
-        result = cv2.flip(result, 1)   # 水平（左右）
+        result = cv2.flip(result, 1)
     if flip_v:
-        result = cv2.flip(result, 0)   # 垂直（上下）
+        result = cv2.flip(result, 0)
 
     # 2. 缩放 + 旋转
     h, w = result.shape[:2]
@@ -220,17 +279,75 @@ def _augment(
         borderValue=(0, 0, 0, 0),
     )
 
-    # 3. 高斯模糊（只处理 RGB，不动 alpha）
+    # 3. 高斯模糊
     if blur_sigma > 0:
         result[:, :, :3] = cv2.GaussianBlur(
             result[:, :, :3], (0, 0), sigmaX=blur_sigma,
         )
 
-    # 4. 亮度调整
-    rgb = result[:, :, :3].astype(np.float32)
-    result[:, :, :3] = np.clip(rgb * brightness, 0, 255).astype(np.uint8)
+    # 4. 对比度调整
+    if abs(contrast - 1.0) > 1e-6:
+        rgb = result[:, :, :3].astype(np.float32)
+        mean = rgb.mean()
+        result[:, :, :3] = np.clip((rgb - mean) * contrast + mean, 0, 255).astype(np.uint8)
 
     return result
+
+
+def _apply_color_mode(img: np.ndarray, mode: str) -> np.ndarray:
+    """色阶模式：白热（亮目标+暗背景）/ 黑热（暗目标+亮背景）/ 保持"""
+    if mode == "keep":
+        return img
+
+    rgb = img[:, :, :3]
+    gray = cv2.cvtColor(rgb, cv2.COLOR_BGR2GRAY) if rgb.shape[2] == 3 else rgb.squeeze()
+    alpha = img[:, :, 3] if img.shape[2] == 4 else np.full(gray.shape, 255, dtype=np.uint8)
+
+    mean_val = gray[alpha > 30].mean() if alpha.max() > 30 else gray.mean()
+
+    should_invert = False
+    if mode == "white_hot" and mean_val < 128:
+        should_invert = True  # 暗目标 → 反色变亮
+    elif mode == "black_hot" and mean_val > 128:
+        should_invert = True  # 亮目标 → 反色变暗
+
+    if should_invert:
+        rgb = 255 - rgb
+        result = np.dstack([rgb, alpha])
+    else:
+        result = img
+
+    return result
+
+
+def _match_histogram_region(src: np.ndarray, ref: np.ndarray) -> np.ndarray:
+    """把 src 的直方图匹配到 ref 的分布，用于消除贴图与背景的温差"""
+    if src.shape != ref.shape:
+        return src
+
+    result = np.empty_like(src)
+    for c in range(src.shape[2] if src.ndim == 3 else 1):
+        if src.ndim == 3:
+            s_ch = src[:, :, c].ravel()
+            r_ch = ref[:, :, c].ravel()
+        else:
+            s_ch = src.ravel()
+            r_ch = ref.ravel()
+
+        # CDF 匹配
+        s_sorted = np.sort(s_ch)
+        r_sorted = np.sort(r_ch)
+        # 线性映射：src 的每个值 → ref 中对应分位数的值
+        s_cdf = np.searchsorted(s_sorted, s_ch, side='right').astype(float)
+        s_cdf = s_cdf / len(s_sorted)
+        mapped = np.interp(s_cdf, np.linspace(0, 1, len(r_sorted)), r_sorted)
+
+        if src.ndim == 3:
+            result[:, :, c] = mapped.reshape(src.shape[:2])
+        else:
+            result = mapped.reshape(src.shape)
+
+    return np.clip(result, 0, 255).astype(np.uint8)
 
 
 # ---- 标签合并工具 ----

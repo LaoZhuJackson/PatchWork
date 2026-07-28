@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
 from qfluentwidgets import (
     PushButton, PrimaryPushButton, ComboBox, ProgressBar,
     BodyLabel, StrongBodyLabel, SubtitleLabel,
-    CardWidget, SpinBox, DoubleSpinBox, RadioButton,
+    CardWidget, SpinBox, DoubleSpinBox, RadioButton, CheckBox,
 )
 
 from app.services.label_reader import IMAGE_EXTS, get_color
@@ -348,6 +348,68 @@ class ImageSynthesisPanel(QWidget):
         row3.addStretch()
         ly.addLayout(row3)
 
+        # ── 色阶 + 融合 + 噪声 ──
+        row_cm = QHBoxLayout()
+        row_cm.addWidget(BodyLabel("色阶:"))
+        self.whitehot_radio = RadioButton("白热")
+        self.blackhot_radio = RadioButton("黑热")
+        self.keepcolor_radio = RadioButton("保持")
+        self.keepcolor_radio.setChecked(True)
+        self._color_group = QButtonGroup(self)
+        self._color_group.addButton(self.whitehot_radio, 0)
+        self._color_group.addButton(self.blackhot_radio, 1)
+        self._color_group.addButton(self.keepcolor_radio, 2)
+        self._color_group.buttonClicked.connect(
+            lambda: set_int("syn_color_mode", self._color_group.checkedId())
+        )
+        row_cm.addWidget(self.whitehot_radio)
+        row_cm.addWidget(self.blackhot_radio)
+        row_cm.addWidget(self.keepcolor_radio)
+
+        row_cm.addSpacing(16)
+        row_cm.addWidget(BodyLabel("融合:"))
+        self.alpha_radio = RadioButton("Alpha")
+        self.poisson_radio = RadioButton("泊松")
+        self.alpha_radio.setChecked(True)
+        self._blend_group = QButtonGroup(self)
+        self._blend_group.addButton(self.alpha_radio, 0)
+        self._blend_group.addButton(self.poisson_radio, 1)
+        self._blend_group.buttonClicked.connect(
+            lambda: set_int("syn_blend_mode", self._blend_group.checkedId())
+        )
+        row_cm.addWidget(self.alpha_radio)
+        row_cm.addWidget(self.poisson_radio)
+        row_cm.addStretch()
+        ly.addLayout(row_cm)
+
+        # ── 直方图匹配 + 噪声 ──
+        row_hn = QHBoxLayout()
+        self.hist_check = CheckBox("直方图匹配 (消除温差)")
+        self.hist_check.stateChanged.connect(
+            lambda: set_bool("syn_match_hist", self.hist_check.isChecked())
+        )
+        row_hn.addWidget(self.hist_check)
+
+        row_hn.addSpacing(16)
+        row_hn.addWidget(BodyLabel("噪声 sigma:"))
+        self.noise_min = DoubleSpinBox()
+        self.noise_min.setRange(0, 50.0)
+        self.noise_min.setSingleStep(0.5)
+        self.noise_min.setDecimals(1)
+        self.noise_min.setValue(0.0)
+        self.noise_min.valueChanged.connect(lambda v: set_float("syn_noise_min", v))
+        row_hn.addWidget(self.noise_min)
+        row_hn.addWidget(BodyLabel("~"))
+        self.noise_max = DoubleSpinBox()
+        self.noise_max.setRange(0, 50.0)
+        self.noise_max.setSingleStep(0.5)
+        self.noise_max.setDecimals(1)
+        self.noise_max.setValue(0.0)
+        self.noise_max.valueChanged.connect(lambda v: set_float("syn_noise_max", v))
+        row_hn.addWidget(self.noise_max)
+        row_hn.addStretch()
+        ly.addLayout(row_hn)
+
         # ── 翻转 ──
         row4 = QHBoxLayout()
         row4.addWidget(BodyLabel("水平翻转概率:"))
@@ -529,14 +591,25 @@ class ImageSynthesisPanel(QWidget):
         # 尺寸模式
         use_pixel = self._size_group.checkedId() == 1
 
+        # 色阶模式
+        color_modes = {0: "white_hot", 1: "black_hot", 2: "keep"}
+        color_mode = color_modes.get(self._color_group.checkedId(), "keep")
+
+        # 融合模式
+        blend_mode = "poisson" if self._blend_group.checkedId() == 1 else "alpha"
+
         try:
             self._compositor = ImageCompositor(
                 instance_dir,
                 size_mode="pixel" if use_pixel else "scale",
                 scale_range=(self.scale_min.value(), self.scale_max.value()),
                 pixel_size=self.pixel_size_spin.value() if use_pixel else 0,
+                color_mode=color_mode,
+                blend_mode=blend_mode,
+                match_histogram=self.hist_check.isChecked(),
                 rotation_range=(self.rot_min.value(), self.rot_max.value()),
                 blur_range=(self.blur_min.value(), self.blur_max.value()),
+                noise_range=(self.noise_min.value(), self.noise_max.value()),
                 flip_h_prob=self.flip_h_spin.value(),
                 flip_v_prob=self.flip_v_spin.value(),
                 class_id=self.class_id_spin.value(),
@@ -604,10 +677,18 @@ class ImageSynthesisPanel(QWidget):
         self.scale_min.setEnabled(enabled)
         self.scale_max.setEnabled(enabled)
         self.pixel_size_spin.setEnabled(enabled)
+        self.whitehot_radio.setEnabled(enabled)
+        self.blackhot_radio.setEnabled(enabled)
+        self.keepcolor_radio.setEnabled(enabled)
+        self.alpha_radio.setEnabled(enabled)
+        self.poisson_radio.setEnabled(enabled)
+        self.hist_check.setEnabled(enabled)
         self.rot_min.setEnabled(enabled)
         self.rot_max.setEnabled(enabled)
         self.blur_min.setEnabled(enabled)
         self.blur_max.setEnabled(enabled)
+        self.noise_min.setEnabled(enabled)
+        self.noise_max.setEnabled(enabled)
         self.flip_h_spin.setEnabled(enabled)
         self.flip_v_spin.setEnabled(enabled)
 
@@ -648,10 +729,25 @@ class ImageSynthesisPanel(QWidget):
         self.scale_max.setValue(get_float("syn_scale_max", 1.5))
         self.pixel_size_spin.setValue(get_int("syn_pixel_size", 200))
 
+        # 色阶模式
+        color_mode = get_int("syn_color_mode", 2)  # 默认保持
+        {0: self.whitehot_radio, 1: self.blackhot_radio, 2: self.keepcolor_radio}[color_mode].setChecked(True)
+
+        # 融合模式
+        if get_int("syn_blend_mode", 0) == 1:
+            self.poisson_radio.setChecked(True)
+        else:
+            self.alpha_radio.setChecked(True)
+
+        # 直方图匹配
+        self.hist_check.setChecked(get_bool("syn_match_hist", False))
+
         # 增强参数
         self.rot_min.setValue(get_float("syn_rot_min", -30))
         self.rot_max.setValue(get_float("syn_rot_max", 30))
         self.blur_min.setValue(get_float("syn_blur_min", 0.0))
         self.blur_max.setValue(get_float("syn_blur_max", 0.0))
+        self.noise_min.setValue(get_float("syn_noise_min", 0.0))
+        self.noise_max.setValue(get_float("syn_noise_max", 0.0))
         self.flip_h_spin.setValue(get_float("syn_flip_h", 0.0))
         self.flip_v_spin.setValue(get_float("syn_flip_v", 0.0))
