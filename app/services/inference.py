@@ -70,7 +70,21 @@ class InferenceEngine:
         if self._model is None:
             raise RuntimeError("模型未加载")
 
-        results = self._model(str(image_path), conf=conf, iou=iou, verbose=False)
+        try:
+            results = self._model(str(image_path), conf=conf, iou=iou, verbose=False)
+        except AttributeError as e:
+            msg = str(e)
+            if "qkv" in msg or "qk" in msg or "AAttn" in msg:
+                raise RuntimeError(
+                    "模型权重与当前 ultralytics 版本不兼容。\n\n"
+                    "可能原因：\n"
+                    "  • YOLO12 老版权重 + 新版 ultralytics\n"
+                    "  • YOLO12 Turbo 权重 + 旧版 ultralytics\n\n"
+                    "解决方法：\n"
+                    f"  1. 升级 ultralytics: pip install ultralytics --upgrade\n"
+                    f"  2. 重新下载匹配的权重文件\n"
+                ) from e
+            raise
         results = results[0]
 
         detections = sv.Detections.from_ultralytics(results)

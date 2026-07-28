@@ -16,6 +16,7 @@ from app.widgets.dataset_split import DatasetSplitPanel
 from app.widgets.export_onnx import ExportONNXPanel
 from app.widgets.gpu_monitor import GPUMonitorPanel
 from app.widgets.home_panel import HomePanel
+from app.widgets.image_synthesis import ImageSynthesisPanel
 from app.widgets.label_preview import LabelPreviewPanel
 from app.widgets.model_infer import ModelInferPanel
 from app.widgets.ndjson_convert import NDJSONConvertPanel
@@ -56,6 +57,7 @@ class MainWindow(FluentWindow):
 
         self._placeholder = {
             "home": HomePanel(),
+            "image_synthesis": ImageSynthesisPanel(),
             "dataset_split": DatasetSplitPanel(),
             "model_infer": ModelInferPanel(),
             "label_preview": LabelPreviewPanel(),
@@ -105,6 +107,11 @@ class MainWindow(FluentWindow):
             position=NavigationItemPosition.TOP,
         )
         # ----- 导航栏上半区（功能入口） -----
+        self.addSubInterface(
+            self._placeholder["image_synthesis"],
+            FIF.IMAGE_EXPORT, "目标合成器",
+            position=NavigationItemPosition.TOP,
+        )
         self.addSubInterface(
             self._placeholder["ndjson_convert"],
             FIF.DOCUMENT, "NDJSON转换",

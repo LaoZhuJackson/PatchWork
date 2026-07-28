@@ -19,7 +19,10 @@ def _setup_albumentations_shim() -> None:
     try:
         __import__(_OLD)
     except ImportError:
-        import albumentations as A
+        try:
+            import albumentations as A  # noqa: F811
+        except ImportError:
+            return  # albumentations 没装，无需 shim
         # 注册父模块
         _parent = "albumentations.augmentations"
         if _parent not in sys.modules:

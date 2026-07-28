@@ -335,8 +335,9 @@ class VideoExtractPanel(QWidget):
 
     def _load_settings(self) -> None:
         path = get_str("extract_video_path")
-        self.video_edit.setText(path)
-        self._load_video(path)
+        if path:
+            self.video_edit.setText(path)
+            self._load_video(path)
 
         self.out_edit.setText(get_str("extract_output_dir"))
 
