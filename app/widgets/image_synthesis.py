@@ -79,10 +79,9 @@ class CompositeWorker(Worker):
         total = len(self.target_paths)
         all_annotations: dict[str, list[dict]] = {}
         for i, path in enumerate(self.target_paths):
-            anns = self.compositor.composite(
-                path, self.output_dir / path.name, self.num_per_image,
-            )
-            all_annotations[str(path)] = anns
+            out_path = self.output_dir / path.name
+            anns = self.compositor.composite(path, out_path, self.num_per_image)
+            all_annotations[str(out_path)] = anns
             if self.label_dir and self.merge_label_dir:
                 merge_labels(self.label_dir, path.name, anns, self.merge_label_dir)
             self.progress.emit(int((i + 1) / total * 100))
