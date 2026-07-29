@@ -118,121 +118,123 @@ def _phase_correlation_register(
 # ---- 数据集生成 ----
 
 def generate_framediff_dataset(
-        dataset_dir: Path,
+        image_dir: Path,
         output_dir: Path,
+        label_dir: Path | None = None,
         gaps: tuple[int, int] = (1, 2),
         registration: str = "none",
         blur_kernel: int = 0,
         image_format: str = "jpg",
         jpg_quality: int = 95,
-        splits: tuple[str, ...] = ("train", "val"),
         overwrite: bool = False,
         progress_callback: Callable[[int], None] | None = None,
 ) -> dict:
-    """生成 Frame Dynamics 数据集，返回 per-split 统计"""
+    """生成 Frame Dynamics 数据集
+
+    Args:
+        image_dir: 图片目录（连续帧）
+        output_dir: 输出根目录
+        label_dir: 标签目录（可选，None 则对全部图片生成不复制标签）
+    Returns:
+        {total, success, missing_current, missing_history, unreadable, write_error, other_error}
+    """
     gap_a, gap_b = gaps
-    all_stats: dict[str, dict] = {}
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    # 统计总标注数
-    total_labels = 0
-    for split in splits:
-        ld = dataset_dir / "labels" / split
-        if ld.is_dir():
-            total_labels += len(list(ld.glob("*.txt")))
+    out_img_dir = output_dir / "images"
+    out_lbl_dir = output_dir / "labels"
+    out_img_dir.mkdir(parents=True, exist_ok=True)
 
-    processed = 0
+    has_labels = label_dir is not None and label_dir.is_dir()
+    if has_labels:
+        out_lbl_dir.mkdir(parents=True, exist_ok=True)
+        label_paths = {p.stem: p for p in label_dir.glob("*.txt")}
+        stems = sorted(label_paths.keys())
+    else:
+        label_paths = {}
+        stems = sorted(
+            p.stem for p in image_dir.iterdir()
+            if p.is_file() and p.suffix.lower() in SUPPORTED_IMAGE_SUFFIXES
+        )
 
-    for split in splits:
-        image_dir = dataset_dir / "images" / split
-        label_dir = dataset_dir / "labels" / split
-        out_img_dir = output_dir / "images" / split
-        out_lbl_dir = output_dir / "labels" / split
+    total = len(stems)
+    frame_index = build_full_frame_index(image_dir)
 
-        if not image_dir.is_dir() or not label_dir.is_dir():
+    stats = {
+        "total": total, "success": 0, "missing_current": 0,
+        "missing_history": 0, "unreadable": 0, "write_error": 0, "other_error": 0,
+    }
+
+    for idx, stem in enumerate(stems):
+        try:
+            video_id = parse_video_id(stem)
+            frame_number = parse_frame_number(stem)
+        except ValueError:
+            stats["other_error"] += 1
             continue
 
-        out_img_dir.mkdir(parents=True, exist_ok=True)
-        out_lbl_dir.mkdir(parents=True, exist_ok=True)
+        video_frames = frame_index.get(video_id)
+        if video_frames is None:
+            stats["missing_current"] += 1
+            continue
 
-        frame_index = build_full_frame_index(image_dir)
-        label_paths = sorted(label_dir.glob("*.txt"))
+        current_path = video_frames.get(frame_number)
+        history_a_path = video_frames.get(frame_number - gap_a)
+        history_b_path = video_frames.get(frame_number - gap_b)
 
-        success = missing_current = missing_history = 0
-        unreadable = write_error = other_error = 0
+        if current_path is None:
+            stats["missing_current"] += 1
+            continue
+        if history_a_path is None or history_b_path is None:
+            stats["missing_history"] += 1
+            continue
 
-        for label_path in label_paths:
-            stem = label_path.stem
-            try:
-                video_id = parse_video_id(stem)
-                frame_number = parse_frame_number(stem)
-            except ValueError:
-                other_error += 1
+        suffix = ".jpg" if image_format == "jpg" else ".png"
+        dest_img = out_img_dir / f"{stem}{suffix}"
+
+        if dest_img.exists() and not overwrite:
+            if not has_labels or (out_lbl_dir / f"{stem}.txt").exists():
+                stats["success"] += 1
+                if progress_callback and total > 0:
+                    progress_callback(int((idx + 1) / total * 100))
                 continue
 
-            video_frames = frame_index.get(video_id)
-            if video_frames is None:
-                missing_current += 1
+        cur = cv2.imread(str(current_path), cv2.IMREAD_GRAYSCALE)
+        pa = cv2.imread(str(history_a_path), cv2.IMREAD_GRAYSCALE)
+        pb = cv2.imread(str(history_b_path), cv2.IMREAD_GRAYSCALE)
+
+        if cur is None or pa is None or pb is None:
+            stats["unreadable"] += 1
+            if progress_callback and total > 0:
+                progress_callback(int((idx + 1) / total * 100))
+            continue
+
+        try:
+            fd = build_frame_dynamics(
+                cur, pa, pb, registration=registration, blur_kernel=blur_kernel,
+            )
+            params = (
+                [cv2.IMWRITE_JPEG_QUALITY, jpg_quality]
+                if image_format == "jpg"
+                else [cv2.IMWRITE_PNG_COMPRESSION, 3]
+            )
+            if not cv2.imwrite(str(dest_img), fd, params):
+                stats["write_error"] += 1
+                if progress_callback and total > 0:
+                    progress_callback(int((idx + 1) / total * 100))
                 continue
 
-            current_path = video_frames.get(frame_number)
-            history_a_path = video_frames.get(frame_number - gap_a)
-            history_b_path = video_frames.get(frame_number - gap_b)
+            if has_labels and stem in label_paths:
+                shutil.copy2(label_paths[stem], out_lbl_dir / f"{stem}.txt")
 
-            if current_path is None:
-                missing_current += 1
-                continue
-            if history_a_path is None or history_b_path is None:
-                missing_history += 1
-                continue
+            stats["success"] += 1
 
-            suffix = ".jpg" if image_format == "jpg" else ".png"
-            dest_img = out_img_dir / f"{stem}{suffix}"
-            dest_lbl = out_lbl_dir / label_path.name
+        except Exception:
+            stats["other_error"] += 1
 
-            if dest_img.exists() and dest_lbl.exists() and not overwrite:
-                success += 1
-                processed += 1
-                continue
-            cur = cv2.imread(str(current_path), cv2.IMREAD_GRAYSCALE)
-            pa = cv2.imread(str(history_a_path), cv2.IMREAD_GRAYSCALE)
-            pb = cv2.imread(str(history_b_path), cv2.IMREAD_GRAYSCALE)
+        if progress_callback and total > 0:
+            progress_callback(int((idx + 1) / total * 100))
 
-            if cur is None or pa is None or pb is None:
-                unreadable += 1
-                processed += 1
-                continue
-
-            try:
-                fd = build_frame_dynamics(cur, pa, pb, registration=registration,blur_kernel=blur_kernel)
-                params = (
-                    [cv2.IMWRITE_JPEG_QUALITY, jpg_quality]
-                    if image_format == "jpg"
-                    else [cv2.IMWRITE_PNG_COMPRESSION, 3]
-                )
-                if not cv2.imwrite(str(dest_img),fd,params):
-                    write_error += 1
-                    processed += 1
-                    continue
-                shutil.copy2(label_path, dest_lbl)
-                success += 1
-
-            except Exception:
-                other_error += 1
-
-            processed += 1
-            if progress_callback and total_labels > 0:
-                progress_callback(int(processed / total_labels * 100))
-
-        all_stats[split] = {
-            "total": len(label_paths),
-            "success": success,
-            "missing_current": missing_current,
-            "missing_history": missing_history,
-            "unreadable": unreadable,
-            "write_error": write_error,
-            "other_error": other_error,
-        }
-
-    return all_stats
+    return stats
 
 
