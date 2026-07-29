@@ -25,7 +25,7 @@ def parse_frame_number(filename: str) -> int:
 def parse_video_id(filename: str) -> str:
     """从 video_name_000123.jpg 解析 video_name"""
     stem = Path(filename).stem
-    match = re.match(r"^(.+)_(\d+)$", stem)
+    match = re.match(r"^(.+?)_(\d+)$", stem)
     if match is None:
         raise ValueError(f"无法从文件名解析视频 ID: {filename}")
     return match.group(1)
