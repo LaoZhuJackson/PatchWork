@@ -18,6 +18,7 @@ from app.widgets.framediff_dataset import FrameDiffDatasetPanel
 from app.widgets.gpu_monitor import GPUMonitorPanel
 from app.widgets.home_panel import HomePanel
 from app.widgets.image_synthesis import ImageSynthesisPanel
+from app.widgets.json_manager import JsonManagerPanel
 from app.widgets.label_preview import LabelPreviewPanel
 from app.widgets.model_infer import ModelInferPanel
 from app.widgets.ndjson_convert import NDJSONConvertPanel
@@ -71,6 +72,7 @@ class MainWindow(FluentWindow):
             "open_vocab_detect": OpenVocabDetectPanel(),
             "ndjson_convert": NDJSONConvertPanel(),
             "framediff_dataset": FrameDiffDatasetPanel(),
+            "json_manager": JsonManagerPanel(),
         }
 
         for name, widget in self._placeholder.items():
@@ -127,6 +129,11 @@ class MainWindow(FluentWindow):
         self.addSubInterface(
             self._placeholder["framediff_dataset"],
             FIF.VIDEO, "帧差数据集",
+            position=NavigationItemPosition.TOP,
+        )
+        self.addSubInterface(
+            self._placeholder["json_manager"],
+            FIF.DOCUMENT, "JSON 管理",
             position=NavigationItemPosition.TOP,
         )
         self.addSubInterface(
