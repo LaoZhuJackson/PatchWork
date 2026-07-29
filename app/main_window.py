@@ -14,6 +14,7 @@ from app.utils.config import get_str, set_str
 from app.widgets.benchmark import BenchmarkPanel
 from app.widgets.dataset_split import DatasetSplitPanel
 from app.widgets.export_onnx import ExportONNXPanel
+from app.widgets.framediff_dataset import FrameDiffDatasetPanel
 from app.widgets.gpu_monitor import GPUMonitorPanel
 from app.widgets.home_panel import HomePanel
 from app.widgets.image_synthesis import ImageSynthesisPanel
@@ -69,6 +70,7 @@ class MainWindow(FluentWindow):
             "benchmark": BenchmarkPanel(),
             "open_vocab_detect": OpenVocabDetectPanel(),
             "ndjson_convert": NDJSONConvertPanel(),
+            "framediff_dataset": FrameDiffDatasetPanel(),
         }
 
         for name, widget in self._placeholder.items():
@@ -120,6 +122,11 @@ class MainWindow(FluentWindow):
         self.addSubInterface(
             self._placeholder["video_extract"],
             FIF.MEDIA, "视频抽帧",
+            position=NavigationItemPosition.TOP,
+        )
+        self.addSubInterface(
+            self._placeholder["framediff_dataset"],
+            FIF.VIDEO, "帧差数据集",
             position=NavigationItemPosition.TOP,
         )
         self.addSubInterface(

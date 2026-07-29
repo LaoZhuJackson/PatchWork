@@ -175,13 +175,13 @@ class GPUMonitorPanel(QWidget):
 
         # Conda 路径
         self.conda_path_edit = LineEdit()
-        self.conda_path_edit.setPlaceholderText("/opt/anaconda3/bin/conda")
+        self.conda_path_edit.setPlaceholderText("例如: /hdd/sdc3/zjs/miniforge3/bin/conda")
         self.conda_path_edit.textChanged.connect(lambda v: set_str("gpu_conda_path", v))
         self.conda_path_label = BodyLabel("Conda 路径:")
         ssh_form.addRow(self.conda_path_label, self.conda_path_edit)
         
         self.conda_env_edit = LineEdit()
-        self.conda_env_edit.setPlaceholderText("例如: yolo_env")
+        self.conda_env_edit.setPlaceholderText("例如: /hdd/sdc3/zjs/conda_envs/zjs-pv")
         self.conda_env_edit.textChanged.connect(lambda v: set_str("gpu_conda_env", v))
         self.conda_env_label = BodyLabel("Conda 环境:")
         ssh_form.addRow(self.conda_env_label, self.conda_env_edit)
@@ -436,7 +436,7 @@ class GPUMonitorPanel(QWidget):
 
     def _load_settings(self) -> None:
         # SSH 通用
-        self.host_edit.setText(get_str("gpu_host", "服务器地址"))
+        self.host_edit.setText(get_str("gpu_host", ""))
         self.port_spin.setValue(get_int("gpu_port", 22))
         self.user_edit.setText(get_str("gpu_username", "root"))
         self.key_edit.setText(get_str("gpu_key_path", ""))
