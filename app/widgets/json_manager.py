@@ -82,11 +82,11 @@ class JsonManagerPanel(QWidget):
         self.prefix_table.horizontalHeader().setSectionResizeMode(
             1, QHeaderView.ResizeMode.Fixed
         )
-        self.prefix_table.setColumnWidth(1, 120)
+        self.prefix_table.setColumnWidth(1, 200)
         self.prefix_table.horizontalHeader().setSectionResizeMode(
             2, QHeaderView.ResizeMode.Fixed
         )
-        self.prefix_table.setColumnWidth(2, 80)
+        self.prefix_table.setColumnWidth(2, 200)
         self.prefix_table.setEditTriggers(TableWidget.EditTrigger.NoEditTriggers)
         self.prefix_table.setAlternatingRowColors(True)
         layout.addWidget(self.prefix_table, 1)
@@ -115,7 +115,7 @@ class JsonManagerPanel(QWidget):
         self.version_edit = LineEdit()
         self.version_edit.setText("4.0.0-beta.13")
         self.version_edit.setPlaceholderText("X-AnyLabeling 版本号")
-        self.version_edit.setVisible(False)
+        self.version_edit.setEnabled(False)
         self.version_edit.textChanged.connect(
             lambda v: set_str("jm_version", v)
         )
@@ -199,8 +199,7 @@ class JsonManagerPanel(QWidget):
 
     def _on_mode_changed(self) -> None:
         is_create = self._mode_group.checkedId() == 1
-
-        self.version_edit.setVisible(is_create)
+        self.version_edit.setEnabled(is_create)
 
     def _get_prefix_intervals(self) -> dict[str, int]:
         result = {}
