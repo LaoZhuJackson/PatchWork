@@ -1,12 +1,9 @@
-"""PPT 汇报生成面板。"""
-
+"""PPT 汇报生成面板"""
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 from pathlib import Path
-from typing import Any
 
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
@@ -17,25 +14,16 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
 from qfluentwidgets import (
-    BodyLabel,
-    CardWidget,
-    CheckBox,
-    ComboBox,
-    LineEdit,
-    PrimaryPushButton,
-    ProgressBar,
-    PushButton,
-    StrongBodyLabel,
-    SubtitleLabel,
+    BodyLabel, CardWidget, CheckBox, ComboBox, LineEdit,
+    PrimaryPushButton, ProgressBar, PushButton,
+    StrongBodyLabel, SubtitleLabel,
 )
 
 from app.services.presentation import (
     PresentationRequest,
     PresentationResult,
     PresentationService,
-    PresentationServiceError,
 )
 from app.utils.config import get_bool, get_str, set_bool, set_str
 from app.utils.message import error, info, warning
@@ -44,15 +32,14 @@ from app.widgets.path_browser import PathBrowser
 
 
 class PresentationWorker(Worker):
-    """后台调用工作区 PPT CLI。"""
+    """后台调用工作区 PPT CLI"""
 
     def __init__(
         self,
         operation: str,
         request: PresentationRequest,
-        parent: QWidget | None = None,
     ) -> None:
-        super().__init__(parent)
+        super().__init__()
         self.operation = operation
         self.request = request
 
@@ -68,7 +55,7 @@ class PresentationWorker(Worker):
 
 
 class PresentationPanel(QWidget):
-    """工作区 PPT 生成面板。"""
+    """工作区 PPT 生成面板"""
 
     def __init__(self) -> None:
         super().__init__()
@@ -88,12 +75,6 @@ class PresentationPanel(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
 
         layout.addWidget(SubtitleLabel("PPT 汇报生成"))
-        intro = BodyLabel(
-            "调用工作区中的 make_slides.py。PatchWork 只负责选择参数、"
-            "执行和打开结果，不复制 Claude/Marp 的生成逻辑。"
-        )
-        intro.setWordWrap(True)
-        layout.addWidget(intro)
 
         # ---- 工作区 ----
         layout.addWidget(StrongBodyLabel("工作区"))
@@ -113,20 +94,25 @@ class PresentationPanel(QWidget):
         profile_row = QHBoxLayout()
         self.profile_combo = ComboBox()
         self.profile_combo.setMinimumWidth(220)
+        self.profile_combo.currentTextChanged.connect(
+            lambda v: set_str("presentation_profile", v)
+        )
         self.refresh_btn = PushButton("刷新")
         self.refresh_btn.clicked.connect(self._refresh_workspace)
         profile_row.addWidget(self.profile_combo, 1)
         profile_row.addWidget(self.refresh_btn)
         workspace_form.addRow(BodyLabel("汇报类型:"), profile_row)
 
+        python_row = QHBoxLayout()
         self.python_edit = LineEdit()
         self.python_edit.setPlaceholderText(
             "留空使用 PatchWork 当前 Python；打包版可填写 python.exe"
         )
-        self.python_edit.editingFinished.connect(
-            lambda: set_str("presentation_python", self.python_edit.text().strip())
+        self.python_edit.textChanged.connect(
+            lambda v: set_str("presentation_python", v)
         )
-        workspace_form.addRow(BodyLabel("Python解释器:"), self.python_edit)
+        python_row.addWidget(self.python_edit)
+        workspace_form.addRow(BodyLabel("Python 解释器:"), python_row)
 
         layout.addWidget(workspace_card)
 
@@ -151,11 +137,8 @@ class PresentationPanel(QWidget):
 
         self.output_name_edit = LineEdit()
         self.output_name_edit.setPlaceholderText("留空时自动使用日期和汇报类型")
-        self.output_name_edit.editingFinished.connect(
-            lambda: set_str(
-                "presentation_output_name",
-                self.output_name_edit.text().strip(),
-            )
+        self.output_name_edit.textChanged.connect(
+            lambda v: set_str("presentation_output_name", v)
         )
         deck_form.addRow(BodyLabel("输出文件名:"), self.output_name_edit)
 
@@ -179,37 +162,42 @@ class PresentationPanel(QWidget):
         self.pptx_check = CheckBox("PPTX")
         self.pdf_check = CheckBox("PDF")
         self.html_check = CheckBox("HTML")
+        self.pptx_check.stateChanged.connect(
+            lambda: set_bool("presentation_pptx", self.pptx_check.isChecked())
+        )
+        self.pdf_check.stateChanged.connect(
+            lambda: set_bool("presentation_pdf", self.pdf_check.isChecked())
+        )
+        self.html_check.stateChanged.connect(
+            lambda: set_bool("presentation_html", self.html_check.isChecked())
+        )
         format_row.addWidget(self.pptx_check)
         format_row.addWidget(self.pdf_check)
         format_row.addWidget(self.html_check)
         format_row.addStretch()
         option_layout.addLayout(format_row)
 
-        self.pptx_check.stateChanged.connect(self._save_format_settings)
-        self.pdf_check.stateChanged.connect(self._save_format_settings)
-        self.html_check.stateChanged.connect(self._save_format_settings)
-
         layout.addWidget(option_card)
 
         # ---- 操作 ----
-        button_row = QHBoxLayout()
+        btn_row = QHBoxLayout()
         self.validate_btn = PushButton("校验配置")
         self.inspect_btn = PushButton("提取项目上下文")
         self.build_btn = PrimaryPushButton("生成汇报")
         self.open_btn = PushButton("打开生成结果")
         self.open_btn.setEnabled(False)
 
-        self.validate_btn.clicked.connect(lambda: self._start_operation("validate"))
-        self.inspect_btn.clicked.connect(lambda: self._start_operation("inspect"))
-        self.build_btn.clicked.connect(lambda: self._start_operation("build"))
+        self.validate_btn.clicked.connect(self._on_validate)
+        self.inspect_btn.clicked.connect(self._on_inspect)
+        self.build_btn.clicked.connect(self._on_build)
         self.open_btn.clicked.connect(self._open_result)
 
-        button_row.addWidget(self.validate_btn)
-        button_row.addWidget(self.inspect_btn)
-        button_row.addStretch()
-        button_row.addWidget(self.open_btn)
-        button_row.addWidget(self.build_btn)
-        layout.addLayout(button_row)
+        btn_row.addWidget(self.validate_btn)
+        btn_row.addWidget(self.inspect_btn)
+        btn_row.addStretch()
+        btn_row.addWidget(self.open_btn)
+        btn_row.addWidget(self.build_btn)
+        layout.addLayout(btn_row)
 
         self.status_label = BodyLabel("请选择工作区")
         layout.addWidget(self.status_label)
@@ -227,86 +215,18 @@ class PresentationPanel(QWidget):
 
         layout.addStretch()
 
-    def _load_settings(self) -> None:
-        self.workspace_browser.path = get_str("presentation_workspace")
-        self.deck_browser.path = get_str("presentation_deck")
-        self.output_dir_browser.path = get_str("presentation_output_dir")
-        self.output_name_edit.setText(get_str("presentation_output_name"))
-        self.python_edit.setText(get_str("presentation_python"))
+    # ---- 操作入口 ----
 
-        self.pptx_check.setChecked(get_bool("presentation_pptx", True))
-        self.pdf_check.setChecked(get_bool("presentation_pdf", True))
-        self.html_check.setChecked(get_bool("presentation_html", False))
+    def _on_validate(self) -> None:
+        self._run_operation("validate")
 
-    def _save_format_settings(self) -> None:
-        set_bool("presentation_pptx", self.pptx_check.isChecked())
-        set_bool("presentation_pdf", self.pdf_check.isChecked())
-        set_bool("presentation_html", self.html_check.isChecked())
+    def _on_inspect(self) -> None:
+        self._run_operation("inspect")
 
-    def _on_workspace_changed(self, _: str) -> None:
-        self._refresh_workspace()
+    def _on_build(self) -> None:
+        self._run_operation("build")
 
-    def _refresh_workspace(self) -> None:
-        workspace_text = self.workspace_browser.path.strip()
-        previous_profile = (
-            self.profile_combo.currentText()
-            if self.profile_combo.count()
-            else get_str("presentation_profile", "技术分享")
-        )
-
-        self.profile_combo.clear()
-
-        if not workspace_text:
-            self.status_label.setText("请选择工作区")
-            return
-
-        workspace = Path(workspace_text)
-        ready, reason = self._service.is_workspace_ready(workspace)
-        if not ready:
-            self.status_label.setText(f"⚠️ {reason}")
-            return
-
-        profiles = self._service.discover_profiles(workspace)
-        self.profile_combo.addItems(profiles)
-
-        preferred = previous_profile if previous_profile in profiles else ""
-        if not preferred:
-            saved = get_str("presentation_profile", "技术分享")
-            preferred = saved if saved in profiles else ""
-        if not preferred and profiles:
-            preferred = profiles[0]
-        if preferred:
-            self.profile_combo.setCurrentText(preferred)
-
-        self.status_label.setText(
-            f"✅ 工作区就绪，共发现 {len(profiles)} 个汇报类型"
-        )
-
-        if not self.deck_browser.path:
-            decks = self._service.discover_decks(workspace)
-            if decks:
-                self.deck_browser.path = str(decks[0])
-
-    def _select_latest_deck(self) -> None:
-        workspace_text = self.workspace_browser.path.strip()
-        if not workspace_text:
-            warning("缺少工作区", "请先选择工作区目录。", self)
-            return
-
-        decks = self._service.discover_decks(workspace_text)
-        if not decks:
-            warning(
-                "未找到 Deck",
-                "没有在 .slides/runtime、.slides/example(s) 或汇报记录中找到 deck YAML。",
-                self,
-            )
-            return
-
-        self.deck_browser.path = str(decks[0])
-        set_str("presentation_deck", str(decks[0]))
-        self.status_label.setText(f"已选择最近 Deck：{decks[0].name}")
-
-    def _start_operation(self, operation: str) -> None:
+    def _run_operation(self, operation: str) -> None:
         if self._worker is not None and self._worker.isRunning():
             warning("任务进行中", "请等待当前任务结束。", self)
             return
@@ -317,24 +237,82 @@ class PresentationPanel(QWidget):
             error("参数错误", str(exc), self)
             return
 
-        if self.profile_combo.currentText():
-            set_str("presentation_profile", self.profile_combo.currentText())
-
-        self._set_busy(True)
-        action_name = {
+        action_names = {
             "validate": "校验配置",
             "inspect": "提取项目上下文",
             "build": "生成汇报",
-        }[operation]
+        }
+        action_name = action_names[operation]
+
+        self._set_inputs_enabled(False)
         self.status_label.setText(f"正在{action_name}...")
         self.log_edit.setPlainText(
             f"操作：{action_name}\n工作区：{request.workspace}\n"
         )
+        self.progress.setVisible(True)
+        self.progress.setValue(0)
 
-        self._worker = PresentationWorker(operation, request, self)
-        self._worker.finished.connect(self._on_finished)
-        self._worker.error.connect(self._on_worker_error)
+        self._worker = PresentationWorker(operation, request)
+        self._worker.finished.connect(self._on_done)
+        self._worker.error.connect(self._on_error)
         self._worker.start()
+
+    # ---- Worker 回调 ----
+
+    def _on_done(self, result: PresentationResult) -> None:
+        self._set_inputs_enabled(True)
+        self.progress.setVisible(False)
+        self._last_outputs = result.outputs
+
+        payload_text = json.dumps(result.payload, ensure_ascii=False, indent=2)
+        command_text = subprocess.list2cmdline(result.command)
+        stderr_text = result.stderr.strip()
+
+        log_parts = [
+            f"命令：{command_text}",
+            "",
+            payload_text,
+        ]
+        if stderr_text:
+            log_parts += ["", "标准错误：", stderr_text]
+        self.log_edit.setPlainText("\n".join(log_parts))
+
+        if result.operation == "validate":
+            self.status_label.setText("✅ 配置校验通过")
+            info("校验完成", "工作区 PPT 配置可正常读取。", self)
+            return
+
+        if result.operation == "inspect":
+            context_file = result.payload.get("context_file")
+            self.status_label.setText("✅ 项目上下文已生成")
+            message = "项目概览上下文提取完成。"
+            if context_file:
+                message += f"\n\n{context_file}"
+                self._last_outputs = {"context": str(context_file)}
+                self.open_btn.setEnabled(True)
+            info("提取完成", message, self)
+            return
+
+        # build
+        self.status_label.setText("✅ 汇报生成完成")
+        self.open_btn.setEnabled(bool(self._last_outputs))
+        outputs = "\n".join(
+            f"{key.upper()}: {value}"
+            for key, value in self._last_outputs.items()
+        )
+        info("生成完成", outputs or "汇报文件已生成。", self)
+
+    def _on_error(self, err: str) -> None:
+        self._set_inputs_enabled(True)
+        self.progress.setVisible(False)
+        self.status_label.setText("❌ 操作失败")
+        self.log_edit.setPlainText(err)
+
+        lines = [line.strip() for line in err.splitlines() if line.strip()]
+        message = lines[-1] if lines else err
+        error("PPT 操作失败", message, self)
+
+    # ---- 请求构建 ----
 
     def _build_request(self, operation: str) -> PresentationRequest:
         workspace_text = self.workspace_browser.path.strip()
@@ -382,86 +360,73 @@ class PresentationPanel(QWidget):
             timeout=600,
         )
 
-    def _on_finished(self, result: PresentationResult) -> None:
-        self._set_busy(False)
-        self._last_outputs = result.outputs
+    # ---- 工作区刷新 ----
 
-        payload_text = json.dumps(
-            result.payload,
-            ensure_ascii=False,
-            indent=2,
+    def _on_workspace_changed(self, _: str) -> None:
+        self._refresh_workspace()
+
+    def _refresh_workspace(self) -> None:
+        workspace_text = self.workspace_browser.path.strip()
+        previous_profile = (
+            self.profile_combo.currentText()
+            if self.profile_combo.count()
+            else get_str("presentation_profile", "技术分享")
         )
-        command_text = subprocess.list2cmdline(result.command)
-        stderr_text = result.stderr.strip()
 
-        log_parts = [
-            f"命令：{command_text}",
-            "",
-            payload_text,
-        ]
-        if stderr_text:
-            log_parts += ["", "标准错误：", stderr_text]
-        self.log_edit.setPlainText("\n".join(log_parts))
+        self.profile_combo.clear()
 
-        if result.operation == "validate":
-            self.status_label.setText("✅ 配置校验通过")
-            info("校验完成", "工作区 PPT 配置可正常读取。", self)
+        if not workspace_text:
+            self.status_label.setText("请选择工作区")
             return
 
-        if result.operation == "inspect":
-            context_file = result.payload.get("context_file")
-            self.status_label.setText("✅ 项目上下文已生成")
-            message = "项目概览上下文提取完成。"
-            if context_file:
-                message += f"\n\n{context_file}"
-                self._last_outputs = {"context": str(context_file)}
-                self.open_btn.setEnabled(True)
-            info("提取完成", message, self)
+        workspace = Path(workspace_text)
+        ready, reason = self._service.is_workspace_ready(workspace)
+        if not ready:
+            self.status_label.setText(f"⚠️ {reason}")
             return
 
-        self.status_label.setText("✅ 汇报生成完成")
-        self.open_btn.setEnabled(bool(self._last_outputs))
-        outputs = "\n".join(
-            f"{key.upper()}: {value}"
-            for key, value in self._last_outputs.items()
+        profiles = self._service.discover_profiles(workspace)
+        self.profile_combo.addItems(profiles)
+
+        preferred = previous_profile if previous_profile in profiles else ""
+        if not preferred:
+            saved = get_str("presentation_profile", "技术分享")
+            preferred = saved if saved in profiles else ""
+        if not preferred and profiles:
+            preferred = profiles[0]
+        if preferred:
+            self.profile_combo.setCurrentText(preferred)
+            set_str("presentation_profile", preferred)
+
+        self.status_label.setText(
+            f"✅ 工作区就绪，共发现 {len(profiles)} 个汇报类型"
         )
-        info("生成完成", outputs or "汇报文件已生成。", self)
 
-    def _on_worker_error(self, traceback_text: str) -> None:
-        self._set_busy(False)
-        self.status_label.setText("❌ 操作失败")
-        self.log_edit.setPlainText(traceback_text)
+        if not self.deck_browser.path:
+            decks = self._service.discover_decks(workspace)
+            if decks:
+                self.deck_browser.path = str(decks[0])
 
-        # Worker 会把异常 traceback 传回来；最后一行通常最适合弹窗展示。
-        lines = [line.strip() for line in traceback_text.splitlines() if line.strip()]
-        message = lines[-1] if lines else traceback_text
-        error("PPT 操作失败", message, self)
+    def _select_latest_deck(self) -> None:
+        workspace_text = self.workspace_browser.path.strip()
+        if not workspace_text:
+            warning("缺少工作区", "请先选择工作区目录。", self)
+            return
 
-    def _set_busy(self, busy: bool) -> None:
-        for widget in (
-            self.workspace_browser,
-            self.profile_combo,
-            self.refresh_btn,
-            self.python_edit,
-            self.deck_browser,
-            self.latest_deck_btn,
-            self.output_name_edit,
-            self.output_dir_browser,
-            self.pptx_check,
-            self.pdf_check,
-            self.html_check,
-            self.validate_btn,
-            self.inspect_btn,
-            self.build_btn,
-        ):
-            widget.setEnabled(not busy)
+        decks = self._service.discover_decks(workspace_text)
+        if not decks:
+            warning(
+                "未找到 Deck",
+                "没有在 .slides/runtime、.slides/example(s) 或汇报记录中找到 deck YAML。",
+                self,
+            )
+            return
 
-        self.progress.setVisible(busy)
-        if busy:
-            self.progress.setRange(0, 0)
-        else:
-            self.progress.setRange(0, 100)
-            self.progress.setValue(0)
+        self.deck_browser.path = str(decks[0])
+        set_str("presentation_deck", str(decks[0]))
+        self.status_label.setText(f"已选择最近 Deck：{decks[0].name}")
+
+    # ---- 打开结果 ----
 
     def _open_result(self) -> None:
         if not self._last_outputs:
@@ -479,3 +444,33 @@ class PresentationPanel(QWidget):
                 return
 
         warning("文件不存在", "没有找到可打开的生成结果。", self)
+
+    # ---- 输入锁 & 持久化 ----
+
+    def _set_inputs_enabled(self, enabled: bool) -> None:
+        """异步操作期间禁用所有输入控件"""
+        self.workspace_browser.setEnabled(enabled)
+        self.profile_combo.setEnabled(enabled)
+        self.refresh_btn.setEnabled(enabled)
+        self.python_edit.setEnabled(enabled)
+        self.deck_browser.setEnabled(enabled)
+        self.latest_deck_btn.setEnabled(enabled)
+        self.output_name_edit.setEnabled(enabled)
+        self.output_dir_browser.setEnabled(enabled)
+        self.pptx_check.setEnabled(enabled)
+        self.pdf_check.setEnabled(enabled)
+        self.html_check.setEnabled(enabled)
+        self.validate_btn.setEnabled(enabled)
+        self.inspect_btn.setEnabled(enabled)
+        self.build_btn.setEnabled(enabled)
+
+    def _load_settings(self) -> None:
+        self.workspace_browser.path = get_str("presentation_workspace")
+        self.deck_browser.path = get_str("presentation_deck")
+        self.output_dir_browser.path = get_str("presentation_output_dir")
+        self.output_name_edit.setText(get_str("presentation_output_name"))
+        self.python_edit.setText(get_str("presentation_python"))
+
+        self.pptx_check.setChecked(get_bool("presentation_pptx", True))
+        self.pdf_check.setChecked(get_bool("presentation_pdf", True))
+        self.html_check.setChecked(get_bool("presentation_html", False))

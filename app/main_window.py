@@ -23,6 +23,7 @@ from app.widgets.label_preview import LabelPreviewPanel
 from app.widgets.model_infer import ModelInferPanel
 from app.widgets.ndjson_convert import NDJSONConvertPanel
 from app.widgets.open_vocab_detect import OpenVocabDetectPanel
+from app.widgets.presentation import PresentationPanel
 from app.widgets.sahi_infer import SahiInferPanel
 from app.widgets.video_extract import VideoExtractPanel
 from app.widgets.xanylabeling import XAnyLabelingPanel
@@ -73,6 +74,7 @@ class MainWindow(FluentWindow):
             "ndjson_convert": NDJSONConvertPanel(),
             "framediff_dataset": FrameDiffDatasetPanel(),
             "json_manager": JsonManagerPanel(),
+            "presentation": PresentationPanel(),
         }
 
         for name, widget in self._placeholder.items():
@@ -111,6 +113,12 @@ class MainWindow(FluentWindow):
             position=NavigationItemPosition.TOP,
         )
         # ----- 导航栏上半区（功能入口） -----
+        self.addSubInterface(
+            self._placeholder["presentation"],
+            FIF.DOCUMENT,
+            "PPT 汇报",
+            position=NavigationItemPosition.TOP,
+        )
         self.addSubInterface(
             self._placeholder["image_synthesis"],
             FIF.IMAGE_EXPORT, "目标合成器",
