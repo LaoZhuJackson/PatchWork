@@ -1,6 +1,7 @@
 """Frame Dynamics 数据集生成：当前帧 + 帧差三通道合成"""
 from __future__ import annotations
 
+import logging
 import re
 import shutil
 from pathlib import Path
@@ -8,6 +9,8 @@ from typing import Callable
 
 import cv2
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 SUPPORTED_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
 
@@ -48,6 +51,49 @@ def build_full_frame_index(images_dir: Path) -> dict[str, dict[int, Path]]:
     return index
 
 
+def _to_grayscale(img: np.ndarray) -> np.ndarray:
+    """确保图像为单通道灰度图"""
+    if img.ndim == 2:
+        return img
+    if img.ndim == 3:
+        if img.shape[2] == 3:
+            return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        if img.shape[2] == 4:
+            return cv2.cvtColor(img, cv2.COLOR_BGRA2GRAY)
+        # fallback: 取第一个通道
+        return img[:, :, 0]
+    return img
+
+
+# ---- 差分增强 ----
+
+# 全局 CLAHE 实例（复用，避免每次创建）
+_clahe = None
+
+
+def _get_clahe(clip_limit: float = 2.0, tile_size: int = 8) -> cv2.CLAHE:
+    """延迟创建 CLAHE 实例"""
+    global _clahe
+    if _clahe is None:
+        _clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=(tile_size, tile_size))
+    return _clahe
+
+
+def _enhance_diff(diff: np.ndarray, mode: str, gain: float) -> np.ndarray:
+    """增强差分通道"""
+    if gain != 1.0:
+        diff = np.clip(diff.astype(np.float32) * gain, 0, 255).astype(np.uint8)
+
+    if mode == "clahe":
+        diff = _get_clahe().apply(diff)
+    elif mode == "normalize":
+        vmin, vmax = diff.min(), diff.max()
+        if vmax > vmin:
+            diff = ((diff.astype(np.float32) - vmin) / (vmax - vmin) * 255).astype(np.uint8)
+
+    return diff
+
+
 # ---- 帧差合成 ----
 
 def build_frame_dynamics(
@@ -56,8 +102,19 @@ def build_frame_dynamics(
         previous_b: np.ndarray,
         registration: str = "none",
         blur_kernel: int = 0,
+        diff_enhance: str = "clahe",
+        diff_gain: float = 1.0,
 ) -> np.ndarray:
-    """三通道合成：BGR = [diff_b, diff_a, current]"""
+    """三通道合成：BGR = [diff_b, diff_a, current]
+
+    Args:
+        diff_enhance: 差分增强模式 — "none" | "clahe" | "normalize"
+        diff_gain: 差分增益乘数 (0.5~5.0)
+    """
+    current = _to_grayscale(current)
+    previous_a = _to_grayscale(previous_a)
+    previous_b = _to_grayscale(previous_b)
+
     h, w = current.shape
 
     if previous_a.shape != (h, w):
@@ -75,6 +132,9 @@ def build_frame_dynamics(
     if blur_kernel > 0:
         diff_a = cv2.GaussianBlur(diff_a, (blur_kernel, blur_kernel), 0)
         diff_b = cv2.GaussianBlur(diff_b, (blur_kernel, blur_kernel), 0)
+
+    diff_a = _enhance_diff(diff_a, mode=diff_enhance, gain=diff_gain)
+    diff_b = _enhance_diff(diff_b, mode=diff_enhance, gain=diff_gain)
 
     return cv2.merge([diff_b, diff_a, current])
 
@@ -115,6 +175,32 @@ def _phase_correlation_register(
     )
 
 
+# ---- 图片写入（绕过 cv2.imwrite 的中文路径问题） ----
+
+def _imwrite(
+    path: str,
+    img: np.ndarray,
+    image_format: str = "jpg",
+    jpg_quality: int = 95,
+) -> bool:
+    """用 cv2.imencode + Python open() 写图片，兼容 Windows 中文路径"""
+    if image_format == "jpg":
+        params = [cv2.IMWRITE_JPEG_QUALITY, jpg_quality]
+        ext = ".jpg"
+    else:
+        params = [cv2.IMWRITE_PNG_COMPRESSION, 3]
+        ext = ".png"
+    success, buf = cv2.imencode(ext, img, params)
+    if not success:
+        return False
+    try:
+        with open(path, "wb") as f:
+            f.write(buf.tobytes())
+        return True
+    except OSError:
+        return False
+
+
 # ---- 数据集生成 ----
 
 def generate_framediff_dataset(
@@ -124,6 +210,8 @@ def generate_framediff_dataset(
         gaps: tuple[int, int] = (1, 2),
         registration: str = "none",
         blur_kernel: int = 0,
+        diff_enhance: str = "clahe",
+        diff_gain: float = 1.0,
         image_format: str = "jpg",
         jpg_quality: int = 95,
         overwrite: bool = False,
@@ -212,13 +300,9 @@ def generate_framediff_dataset(
         try:
             fd = build_frame_dynamics(
                 cur, pa, pb, registration=registration, blur_kernel=blur_kernel,
+                diff_enhance=diff_enhance, diff_gain=diff_gain,
             )
-            params = (
-                [cv2.IMWRITE_JPEG_QUALITY, jpg_quality]
-                if image_format == "jpg"
-                else [cv2.IMWRITE_PNG_COMPRESSION, 3]
-            )
-            if not cv2.imwrite(str(dest_img), fd, params):
+            if not _imwrite(str(dest_img), fd, image_format, jpg_quality):
                 stats["write_error"] += 1
                 if progress_callback and total > 0:
                     progress_callback(int((idx + 1) / total * 100))
@@ -231,6 +315,8 @@ def generate_framediff_dataset(
 
         except Exception:
             stats["other_error"] += 1
+            if stats["other_error"] <= 3:
+                logger.exception("生成帧差失败 [%s]: %s", stem, dest_img)
 
         if progress_callback and total > 0:
             progress_callback(int((idx + 1) / total * 100))

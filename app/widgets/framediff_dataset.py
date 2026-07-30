@@ -40,6 +40,8 @@ class FrameDiffWorker(Worker):
         gap_b: int,
         registration: str,
         blur_kernel: int,
+        diff_enhance: str,
+        diff_gain: float,
         image_format: str,
         jpg_quality: int,
         overwrite: bool,
@@ -52,6 +54,8 @@ class FrameDiffWorker(Worker):
         self.gap_b = gap_b
         self.registration = registration
         self.blur_kernel = blur_kernel
+        self.diff_enhance = diff_enhance
+        self.diff_gain = diff_gain
         self.image_format = image_format
         self.jpg_quality = jpg_quality
         self.overwrite = overwrite
@@ -64,6 +68,8 @@ class FrameDiffWorker(Worker):
             gaps=(self.gap_a, self.gap_b),
             registration=self.registration,
             blur_kernel=self.blur_kernel,
+            diff_enhance=self.diff_enhance,
+            diff_gain=self.diff_gain,
             image_format=self.image_format,
             jpg_quality=self.jpg_quality,
             overwrite=self.overwrite,
@@ -162,6 +168,30 @@ class FrameDiffDatasetPanel(QWidget):
         mid_row.addStretch()
         param_layout.addLayout(mid_row)
 
+        diff_row = QHBoxLayout()
+        diff_row.addWidget(BodyLabel("差分增强:"))
+        self.diff_enhance_combo = ComboBox()
+        self.diff_enhance_combo.addItems(["clahe", "normalize", "none"])
+        self.diff_enhance_combo.setCurrentText("clahe")
+        self.diff_enhance_combo.setToolTip("clahe=局部自适应均衡（推荐） / normalize=全局拉伸 / none=原始差值")
+        self.diff_enhance_combo.currentTextChanged.connect(
+            lambda v: set_str("fd_diff_enhance", v)
+        )
+        diff_row.addWidget(self.diff_enhance_combo)
+
+        diff_row.addSpacing(16)
+        diff_row.addWidget(BodyLabel("增益:"))
+        from qfluentwidgets import DoubleSpinBox
+        self.diff_gain_spin = DoubleSpinBox()
+        self.diff_gain_spin.setRange(0.5, 5.0)
+        self.diff_gain_spin.setSingleStep(0.1)
+        self.diff_gain_spin.setValue(1.0)
+        self.diff_gain_spin.setToolTip("差分乘数，>1 增强运动信号，<1 减弱")
+        self.diff_gain_spin.valueChanged.connect(lambda v: set_str("fd_diff_gain", str(v)))
+        diff_row.addWidget(self.diff_gain_spin)
+        diff_row.addStretch()
+        param_layout.addLayout(diff_row)
+
         fmt_row = QHBoxLayout()
         fmt_row.addWidget(BodyLabel("输出格式:"))
         self.fmt_combo = ComboBox()
@@ -252,6 +282,8 @@ class FrameDiffDatasetPanel(QWidget):
             gap_a, gap_b,
             self.reg_combo.currentText(),
             blur_kernel,
+            self.diff_enhance_combo.currentText(),
+            self.diff_gain_spin.value(),
             self.fmt_combo.currentText(),
             self.quality_spin.value(),
             self.overwrite_check.isChecked(),
@@ -274,7 +306,9 @@ class FrameDiffDatasetPanel(QWidget):
             f"成功: {stats['success']}\n"
             f"缺当前帧: {stats['missing_current']}\n"
             f"缺历史帧: {stats['missing_history']}\n"
-            f"读取失败: {stats['unreadable']}",
+            f"读取失败: {stats['unreadable']}\n"
+            f"写入失败: {stats['write_error']}\n"
+            f"其他错误: {stats['other_error']}",
             self,
         )
 
@@ -293,6 +327,8 @@ class FrameDiffDatasetPanel(QWidget):
         self.gap_b_spin.setEnabled(enabled)
         self.reg_combo.setEnabled(enabled)
         self.blur_spin.setEnabled(enabled)
+        self.diff_enhance_combo.setEnabled(enabled)
+        self.diff_gain_spin.setEnabled(enabled)
         self.fmt_combo.setEnabled(enabled)
         self.quality_spin.setEnabled(enabled)
         self.overwrite_check.setEnabled(enabled)
@@ -307,6 +343,8 @@ class FrameDiffDatasetPanel(QWidget):
         self.gap_b_spin.setValue(get_int("fd_gap_b", 2))
         self.reg_combo.setCurrentText(get_str("fd_registration", "none"))
         self.blur_spin.setValue(get_int("fd_blur", 0))
+        self.diff_enhance_combo.setCurrentText(get_str("fd_diff_enhance", "clahe"))
+        self.diff_gain_spin.setValue(float(get_str("fd_diff_gain", "1.0")))
         self.fmt_combo.setCurrentText(get_str("fd_format", "jpg"))
         self.quality_spin.setValue(get_int("fd_quality", 95))
         self.overwrite_check.setChecked(get_bool("fd_overwrite", False))
