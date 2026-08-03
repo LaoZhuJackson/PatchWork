@@ -174,6 +174,33 @@ class PresentationService:
         return self._run("build", req, args)
 
     @staticmethod
+    def discover_themes(workspace: str | Path) -> list[dict[str, str]]:
+        """扫描 .slides/themes/*.css，提取 @theme 名称。
+
+        Returns:
+            [{"name": "workspace-default", "file": "default.css"}, ...]
+        """
+        themes_dir = Path(workspace).expanduser() / ".slides" / "themes"
+        if not themes_dir.is_dir():
+            return []
+
+        results: list[dict[str, str]] = []
+        for path in sorted(themes_dir.glob("*.css"), key=lambda p: p.name.casefold()):
+            try:
+                text = path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            # 提取 /* @theme xxx */ 注释中的主题名
+            import re
+            match = re.search(r"/\*\s*@theme\s+(\S+)\s*\*/", text)
+            if match:
+                results.append({"name": match.group(1), "file": path.name})
+            else:
+                # 回退：用文件名（去掉 .css）作为主题名
+                results.append({"name": path.stem, "file": path.name})
+        return results
+
+    @staticmethod
     def discover_profiles(workspace: str | Path) -> list[str]:
         profiles_dir = Path(workspace).expanduser() / ".slides" / "profiles"
         if not profiles_dir.is_dir():

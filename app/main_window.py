@@ -27,6 +27,7 @@ from app.widgets.presentation import PresentationPanel
 from app.widgets.sahi_infer import SahiInferPanel
 from app.widgets.video_extract import VideoExtractPanel
 from app.widgets.xanylabeling import XAnyLabelingPanel
+from app.widgets.pseudo_thermal import PseudoThermalPanel
 
 from pathlib import Path
 
@@ -75,6 +76,7 @@ class MainWindow(FluentWindow):
             "framediff_dataset": FrameDiffDatasetPanel(),
             "json_manager": JsonManagerPanel(),
             "presentation": PresentationPanel(),
+            "pseudo_thermal": PseudoThermalPanel(),
         }
 
         for name, widget in self._placeholder.items():
@@ -117,6 +119,11 @@ class MainWindow(FluentWindow):
             self._placeholder["presentation"],
             FIF.DOCUMENT,
             "PPT 汇报",
+            position=NavigationItemPosition.TOP,
+        )
+        self.addSubInterface(
+            self._placeholder["pseudo_thermal"],
+            FIF.IMAGE_EXPORT, "伪热红外图像增强",
             position=NavigationItemPosition.TOP,
         )
         self.addSubInterface(

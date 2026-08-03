@@ -103,6 +103,16 @@ class PresentationPanel(QWidget):
         profile_row.addWidget(self.refresh_btn)
         workspace_form.addRow(BodyLabel("汇报类型:"), profile_row)
 
+        theme_row = QHBoxLayout()
+        self.theme_combo = ComboBox()
+        self.theme_combo.setMinimumWidth(220)
+        self.theme_combo.currentTextChanged.connect(
+            lambda v: set_str("presentation_theme", v)
+        )
+        theme_row.addWidget(self.theme_combo, 1)
+        theme_row.addStretch()
+        workspace_form.addRow(BodyLabel("PPT 主题:"), theme_row)
+
         python_row = QHBoxLayout()
         self.python_edit = LineEdit()
         self.python_edit.setPlaceholderText(
@@ -325,6 +335,7 @@ class PresentationPanel(QWidget):
             raise ValueError(f"工作区尚未准备好：{reason}")
 
         profile = self.profile_combo.currentText().strip()
+        theme = self.theme_combo.currentText().strip() if self.theme_combo.count() else ""
         formats = tuple(
             name
             for name, checked in (
@@ -352,6 +363,7 @@ class PresentationPanel(QWidget):
         return PresentationRequest(
             workspace=workspace,
             profile=profile,
+            theme=theme,
             deck=deck,
             output_dir=output_dir,
             output_name=self.output_name_edit.text().strip(),
@@ -372,8 +384,14 @@ class PresentationPanel(QWidget):
             if self.profile_combo.count()
             else get_str("presentation_profile", "技术分享")
         )
+        previous_theme = (
+            self.theme_combo.currentText()
+            if self.theme_combo.count()
+            else get_str("presentation_theme", "")
+        )
 
         self.profile_combo.clear()
+        self.theme_combo.clear()
 
         if not workspace_text:
             self.status_label.setText("请选择工作区")
@@ -398,8 +416,30 @@ class PresentationPanel(QWidget):
             self.profile_combo.setCurrentText(preferred)
             set_str("presentation_profile", preferred)
 
+        # ---- 主题发现 ----
+        themes = self._service.discover_themes(workspace)
+        if themes:
+            theme_names = [t["name"] for t in themes]
+            self.theme_combo.addItems(theme_names)
+
+            preferred_theme = previous_theme if previous_theme in theme_names else ""
+            if not preferred_theme:
+                saved = get_str("presentation_theme", "")
+                preferred_theme = saved if saved in theme_names else ""
+            if not preferred_theme and theme_names:
+                # 优先选 signal，其次选 workspace-default
+                for fav in ("signal", "workspace-default"):
+                    if fav in theme_names:
+                        preferred_theme = fav
+                        break
+                if not preferred_theme:
+                    preferred_theme = theme_names[0]
+            if preferred_theme:
+                self.theme_combo.setCurrentText(preferred_theme)
+                set_str("presentation_theme", preferred_theme)
+
         self.status_label.setText(
-            f"✅ 工作区就绪，共发现 {len(profiles)} 个汇报类型"
+            f"✅ 工作区就绪，共发现 {len(profiles)} 个汇报类型、{len(themes)} 个主题"
         )
 
         if not self.deck_browser.path:
@@ -451,6 +491,7 @@ class PresentationPanel(QWidget):
         """异步操作期间禁用所有输入控件"""
         self.workspace_browser.setEnabled(enabled)
         self.profile_combo.setEnabled(enabled)
+        self.theme_combo.setEnabled(enabled)
         self.refresh_btn.setEnabled(enabled)
         self.python_edit.setEnabled(enabled)
         self.deck_browser.setEnabled(enabled)
