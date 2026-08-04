@@ -117,23 +117,23 @@ class MainWindow(FluentWindow):
         # ----- 导航栏上半区（功能入口） -----
         self.addSubInterface(
             self._placeholder["presentation"],
-            FIF.DOCUMENT,
+            FIF.PROJECTOR,
             "PPT 汇报",
             position=NavigationItemPosition.TOP,
         )
         self.addSubInterface(
             self._placeholder["pseudo_thermal"],
-            FIF.IMAGE_EXPORT, "伪热红外图像增强",
+            FIF.CALORIES, "伪热红外增强",
             position=NavigationItemPosition.TOP,
         )
         self.addSubInterface(
             self._placeholder["image_synthesis"],
-            FIF.IMAGE_EXPORT, "目标合成器",
+            FIF.TRANSPARENT, "目标合成器",
             position=NavigationItemPosition.TOP,
         )
         self.addSubInterface(
             self._placeholder["ndjson_convert"],
-            FIF.DOCUMENT, "NDJSON转换",
+            FIF.CODE, "NDJSON转换",
             position=NavigationItemPosition.TOP,
         )
         self.addSubInterface(
@@ -148,7 +148,7 @@ class MainWindow(FluentWindow):
         )
         self.addSubInterface(
             self._placeholder["json_manager"],
-            FIF.DOCUMENT, "JSON 管理",
+            FIF.FOLDER, "JSON 管理",
             position=NavigationItemPosition.TOP,
         )
         self.addSubInterface(

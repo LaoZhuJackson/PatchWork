@@ -213,10 +213,12 @@ class PseudoThermalPanel(QWidget):
 
         # 原图
         left_col = QVBoxLayout()
-        left_col.addWidget(BodyLabel("原图 (RGB)"))
+        left_label = BodyLabel("原图 (RGB)")
+        left_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        left_col.addWidget(left_label)
         self.original_viewer = ImageViewer()
         self.original_viewer.setMinimumHeight(250)
-        left_col.addWidget(self.original_viewer, 1)
+        left_col.addWidget(self.original_viewer, 1, Qt.AlignmentFlag.AlignCenter)
         preview_layout.addLayout(left_col, 1)
 
         # → 箭头
@@ -226,10 +228,12 @@ class PseudoThermalPanel(QWidget):
 
         # 结果
         right_col = QVBoxLayout()
-        right_col.addWidget(BodyLabel("伪热红外"))
+        right_label = BodyLabel("伪热红外")
+        right_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        right_col.addWidget(right_label)
         self.result_viewer = ImageViewer()
         self.result_viewer.setMinimumHeight(250)
-        right_col.addWidget(self.result_viewer, 1)
+        right_col.addWidget(self.result_viewer, 1, Qt.AlignmentFlag.AlignCenter)
         preview_layout.addLayout(right_col, 1)
 
         layout.addWidget(preview_card)
