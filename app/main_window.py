@@ -118,92 +118,92 @@ class MainWindow(FluentWindow):
             FIF.HOME, "首页",
             position=NavigationItemPosition.TOP,
         )
-        # ----- 导航栏上半区（功能入口） -----
+        # ----- 导航栏（可滚动区） -----
         self.addSubInterface(
             self._placeholder["presentation"],
             FIF.PROJECTOR,
             "PPT 汇报",
-            position=NavigationItemPosition.TOP,
+            position=NavigationItemPosition.SCROLL,
         )
         self.addSubInterface(
             self._placeholder["pseudo_thermal"],
             FIF.CALORIES, "伪热红外增强",
-            position=NavigationItemPosition.TOP,
+            position=NavigationItemPosition.SCROLL,
         )
         self.addSubInterface(
             self._placeholder["irvis_annotator"],
             FIF.PIN, "IR-VIS 标注",
-            position=NavigationItemPosition.TOP,
+            position=NavigationItemPosition.SCROLL,
         )
         self.addSubInterface(
             self._placeholder["image_synthesis"],
             FIF.TRANSPARENT, "目标合成器",
-            position=NavigationItemPosition.TOP,
+            position=NavigationItemPosition.SCROLL,
         )
         self.addSubInterface(
             self._placeholder["ndjson_convert"],
             FIF.CODE, "NDJSON转换",
-            position=NavigationItemPosition.TOP,
+            position=NavigationItemPosition.SCROLL,
         )
         self.addSubInterface(
             self._placeholder["video_extract"],
             FIF.MEDIA, "视频抽帧",
-            position=NavigationItemPosition.TOP,
+            position=NavigationItemPosition.SCROLL,
         )
         self.addSubInterface(
             self._placeholder["framediff_dataset"],
             FIF.VIDEO, "帧差数据集",
-            position=NavigationItemPosition.TOP,
+            position=NavigationItemPosition.SCROLL,
         )
         self.addSubInterface(
             self._placeholder["json_manager"],
             FIF.FOLDER, "JSON 管理",
-            position=NavigationItemPosition.TOP,
+            position=NavigationItemPosition.SCROLL,
         )
         self.addSubInterface(
             self._placeholder["dataset_split"],
             FIF.APPLICATION, "数据集划分",
-            position=NavigationItemPosition.TOP,
+            position=NavigationItemPosition.SCROLL,
         )
         self.addSubInterface(
             self._placeholder["gpu_monitor"],
             FIF.IOT, "GPU监控",
-            position=NavigationItemPosition.TOP,
+            position=NavigationItemPosition.SCROLL,
         )
         self.addSubInterface(
             self._placeholder["open_vocab_detect"],
             FIF.TAG, "开放词汇检测",
-            position=NavigationItemPosition.TOP,
+            position=NavigationItemPosition.SCROLL,
         )
         self.addSubInterface(
             self._placeholder["model_infer"],
             FIF.PHOTO, "模型推理",
-            position=NavigationItemPosition.TOP,
+            position=NavigationItemPosition.SCROLL,
         )
         self.addSubInterface(
             self._placeholder["sahi_infer"],
             FIF.ZOOM, "SAHI 推理",
-            position=NavigationItemPosition.TOP,
+            position=NavigationItemPosition.SCROLL,
         )
         self.addSubInterface(
             self._placeholder["benchmark"],
             FIF.ALBUM, "推理对比",
-            position=NavigationItemPosition.TOP,
+            position=NavigationItemPosition.SCROLL,
         )
         self.addSubInterface(
             self._placeholder["export_onnx"],
             FIF.SAVE_AS, "导出ONNX",
-            position=NavigationItemPosition.TOP,
+            position=NavigationItemPosition.SCROLL,
         )
         self.addSubInterface(
             self._placeholder["label_preview"],
             FIF.TILES, "Label预览",
-            position=NavigationItemPosition.TOP,
+            position=NavigationItemPosition.SCROLL,
         )
         self.addSubInterface(
             self._placeholder["xanylabeling"],
             FIF.LINK, "X-AnyLabeling",
-            position=NavigationItemPosition.TOP,
+            position=NavigationItemPosition.SCROLL,
         )
 
         # ----- 导航栏下半区（工具入口） -----
