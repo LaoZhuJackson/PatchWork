@@ -217,7 +217,7 @@ class PseudoThermalPanel(QWidget):
         left_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         left_col.addWidget(left_label)
         self.original_viewer = ImageViewer()
-        self.original_viewer.setMinimumHeight(250)
+        self.original_viewer.setMinimumHeight(200)
         left_col.addWidget(self.original_viewer, 1, Qt.AlignmentFlag.AlignCenter)
         preview_layout.addLayout(left_col, 1)
 
@@ -232,7 +232,7 @@ class PseudoThermalPanel(QWidget):
         right_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         right_col.addWidget(right_label)
         self.result_viewer = ImageViewer()
-        self.result_viewer.setMinimumHeight(250)
+        self.result_viewer.setMinimumHeight(200)
         right_col.addWidget(self.result_viewer, 1, Qt.AlignmentFlag.AlignCenter)
         preview_layout.addLayout(right_col, 1)
 

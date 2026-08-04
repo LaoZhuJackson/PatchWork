@@ -1,7 +1,7 @@
 """通用图片查看器：QGraphicsView 封装，支持缩放、拖拽、叠加绘制"""
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QRectF, QPointF
+from PySide6.QtCore import Qt, QRectF, QPointF, Signal
 from PySide6.QtGui import (
     QBrush,
     QColor,
@@ -24,7 +24,14 @@ ZOOM_FACTOR = 1.15
 
 
 class ImageViewer(QGraphicsView):
-    """可缩放、拖拽的图片查看器，支持在图片上叠加框、多边形、文字"""
+    """可缩放、拖拽的图片查看器，支持在图片上叠加框、多边形、文字
+
+    交互模式:
+      - "pan" (默认): 左键拖拽平移, 滚轮缩放
+      - "pick": 左键发射 clicked 信号(场景坐标), 中键拖拽平移, 滚轮缩放
+    """
+
+    clicked = Signal(QPointF)  # 点击信号（仅在 pick 模式下发射场景坐标）
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -35,25 +42,26 @@ class ImageViewer(QGraphicsView):
         self._pixmap_item = self._scene.addPixmap(QPixmap())
 
         # 交互设置
-        self.setRenderHint(QPainter.RenderHint.Antialiasing)  # 抗锯齿：让图形边缘平滑，消除锯齿
-        self.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)  # 平滑像素图变换：缩放/旋转图片时保持平滑，避免像素化
+        self.setRenderHint(QPainter.RenderHint.Antialiasing)
+        self.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
 
-        self.setDragMode(QGraphicsView.DragMode.NoDrag)  # 拖拽模式：禁用视图的默认拖拽（后续自定义拖拽逻辑）
+        self.setDragMode(QGraphicsView.DragMode.NoDrag)
 
-        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)  # 变换锚点：缩放/旋转时以鼠标位置为中心
-        self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)  # 调整锚点：视图大小变化时锚点在鼠标位置
+        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+        self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
 
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)  # 水平滚动条：始终隐藏
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)  # 垂直滚动条：始终隐藏
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
-        self.setFrameShape(QGraphicsView.Shape.NoFrame)  # 边框样式：无边框，让视图融入界面
+        self.setFrameShape(QGraphicsView.Shape.NoFrame)
 
         self.setBackgroundBrush(QBrush(Qt.BrushStyle.NoBrush))
-        self.setStyleSheet("QGraphicsView { background: transparent; }")  # 透明背景
+        self.setStyleSheet("QGraphicsView { background: transparent; }")
 
-        self._overlay_items: list = []  # 叠加层列表：存储所有叠加在场景上的图形项（如标注、选框等）
-        self._is_dragging = False  # 拖拽状态标志：记录当前是否正在拖拽
-        self._last_mouse_pos = QPointF()  # 上次鼠标位置：用于计算拖拽时的移动偏移量
+        self._overlay_items: list = []
+        self._is_dragging = False
+        self._last_mouse_pos = QPointF()
+        self._interaction_mode = "pan"  # "pan" | "pick"
 
     # ---- 公共 API ----
     def set_image(self, pixmap: QPixmap | None) -> None:
@@ -66,6 +74,14 @@ class ImageViewer(QGraphicsView):
         self._pixmap_item.setPixmap(pixmap)
         self._scene.setSceneRect(QRectF(pixmap.rect()))
         self.fitInView(self._scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
+
+    def set_interaction_mode(self, mode: str) -> None:
+        """设置交互模式: "pan"(拖拽平移) | "pick"(点击选点)"""
+        self._interaction_mode = mode
+        if mode == "pick":
+            self.setCursor(Qt.CursorShape.CrossCursor)
+        else:
+            self.setCursor(Qt.CursorShape.ArrowCursor)
 
     def fit_to_window(self) -> None:
         """缩放至适应窗口"""
@@ -126,10 +142,23 @@ class ImageViewer(QGraphicsView):
         self.scale(factor, factor)
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
-        if event.button() == Qt.MouseButton.LeftButton:
-            self._is_dragging = True
-            self._last_mouse_pos = event.position()
-            self.setCursor(Qt.CursorShape.ClosedHandCursor)
+        if self._interaction_mode == "pick":
+            if event.button() == Qt.MouseButton.LeftButton:
+                scene_pos = self.mapToScene(event.position().toPoint())
+                self.clicked.emit(scene_pos)
+                event.accept()
+                return
+            elif event.button() == Qt.MouseButton.MiddleButton:
+                self._is_dragging = True
+                self._last_mouse_pos = event.position()
+                self.setCursor(Qt.CursorShape.ClosedHandCursor)
+                event.accept()
+                return
+        else:
+            if event.button() == Qt.MouseButton.LeftButton:
+                self._is_dragging = True
+                self._last_mouse_pos = event.position()
+                self.setCursor(Qt.CursorShape.ClosedHandCursor)
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
@@ -145,7 +174,12 @@ class ImageViewer(QGraphicsView):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
-        if event.button() == Qt.MouseButton.LeftButton:
-            self._is_dragging = False
-            self.setCursor(Qt.CursorShape.ArrowCursor)
+        if self._interaction_mode == "pick":
+            if event.button() == Qt.MouseButton.MiddleButton:
+                self._is_dragging = False
+                self.setCursor(Qt.CursorShape.CrossCursor)
+        else:
+            if event.button() == Qt.MouseButton.LeftButton:
+                self._is_dragging = False
+                self.setCursor(Qt.CursorShape.ArrowCursor)
         super().mouseReleaseEvent(event)

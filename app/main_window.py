@@ -28,6 +28,7 @@ from app.widgets.sahi_infer import SahiInferPanel
 from app.widgets.video_extract import VideoExtractPanel
 from app.widgets.xanylabeling import XAnyLabelingPanel
 from app.widgets.pseudo_thermal import PseudoThermalPanel
+from app.widgets.irvis_annotator import IRVISAnnotatorPanel
 
 from pathlib import Path
 
@@ -39,7 +40,9 @@ class MainWindow(FluentWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("PatchWork")
-        self.resize(900, 700)
+
+        # 显式覆盖最小尺寸，防止导航栏/面板的 minimumSizeHint 撑大窗口
+        self.setMinimumSize(900, 700)
 
         self.setWindowIcon(QIcon(QPixmap(str(_ICON_PATH))))
 
@@ -77,6 +80,7 @@ class MainWindow(FluentWindow):
             "json_manager": JsonManagerPanel(),
             "presentation": PresentationPanel(),
             "pseudo_thermal": PseudoThermalPanel(),
+            "irvis_annotator": IRVISAnnotatorPanel(),
         }
 
         for name, widget in self._placeholder.items():
@@ -124,6 +128,11 @@ class MainWindow(FluentWindow):
         self.addSubInterface(
             self._placeholder["pseudo_thermal"],
             FIF.CALORIES, "伪热红外增强",
+            position=NavigationItemPosition.TOP,
+        )
+        self.addSubInterface(
+            self._placeholder["irvis_annotator"],
+            FIF.PIN, "IR-VIS 标注",
             position=NavigationItemPosition.TOP,
         )
         self.addSubInterface(

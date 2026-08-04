@@ -219,7 +219,7 @@ class PresentationPanel(QWidget):
         layout.addWidget(StrongBodyLabel("执行日志"))
         self.log_edit = QPlainTextEdit()
         self.log_edit.setReadOnly(True)
-        self.log_edit.setMinimumHeight(220)
+        self.log_edit.setMinimumHeight(120)
         self.log_edit.setPlaceholderText("校验、提取上下文和生成结果会显示在这里。")
         layout.addWidget(self.log_edit)
 
