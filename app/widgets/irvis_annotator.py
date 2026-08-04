@@ -31,8 +31,9 @@ from app.utils.logger import get_logger
 logger = get_logger(__name__)
 
 # ── 常量 ──
-RED = QColor(255, 60, 60)
-YELLOW = QColor(255, 200, 0)
+GREEN = QColor(0, 200, 80)     # 十字标颜色
+RED = QColor(255, 60, 60)      # 序号颜色
+YELLOW = QColor(255, 200, 0)   # pending IR 点十字标
 CROSS_SIZE = 20     # 十字线半长（像素）
 
 
@@ -43,23 +44,29 @@ CROSS_SIZE = 20     # 十字线半长（像素）
 def _draw_cross(
     viewer: ImageViewer,
     x: float, y: float,
-    color: QColor,
+    cross_color: QColor,
     label: str = "",
+    label_color: QColor = RED,
 ) -> None:
-    """在 viewer 上绘制十字标记 + 可选序号（文字标注在右上方，不画矩形框）"""
+    """在 viewer 上绘制十字标记 + 可选序号
+
+    Args:
+        cross_color: 十字线颜色
+        label_color: 序号文字颜色（默认红色）
+    """
     points = [
         QPointF(x - CROSS_SIZE, y),
         QPointF(x + CROSS_SIZE, y),
     ]
-    viewer.add_polygon(points, color, line_width=2.0)
+    viewer.add_polygon(points, cross_color, line_width=2.0)
     points_v = [
         QPointF(x, y - CROSS_SIZE),
         QPointF(x, y + CROSS_SIZE),
     ]
-    viewer.add_polygon(points_v, color, line_width=2.0)
+    viewer.add_polygon(points_v, cross_color, line_width=2.0)
 
     if label:
-        viewer.add_text(QPointF(x + 14, y - 10), label, color, size=14)
+        viewer.add_text(QPointF(x + 14, y - 10), label, label_color, size=14)
 
 
 def _refresh_overlays(
@@ -74,8 +81,8 @@ def _refresh_overlays(
     # 已完成的对 — 绿色 + 编号
     for i, (ir_pt, vis_pt) in enumerate(zip(state.ir_pts, state.vis_pts)):
         num = str(i + 1)
-        _draw_cross(ir_viewer, ir_pt[0], ir_pt[1], RED, num)
-        _draw_cross(vis_viewer, vis_pt[0], vis_pt[1], RED, num)
+        _draw_cross(ir_viewer, ir_pt[0], ir_pt[1], GREEN, num)
+        _draw_cross(vis_viewer, vis_pt[0], vis_pt[1], GREEN, num)
 
     # pending IR 点 — 黄色 + 无编号
     if state.pending_ir is not None:
