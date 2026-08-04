@@ -46,7 +46,7 @@ def _draw_cross(
     color: QColor,
     label: str = "",
 ) -> None:
-    """在 viewer 上绘制十字标记 + 可选序号"""
+    """在 viewer 上绘制十字标记 + 可选序号（文字标注在右上方，不画矩形框）"""
     points = [
         QPointF(x - CROSS_SIZE, y),
         QPointF(x + CROSS_SIZE, y),
@@ -59,13 +59,7 @@ def _draw_cross(
     viewer.add_polygon(points_v, color, line_width=2.0)
 
     if label:
-        from PySide6.QtCore import QRectF
-        viewer.add_bbox(
-            QRectF(x + 14, y - 10, 30, 20),
-            color,
-            label,
-            line_width=0.5,
-        )
+        viewer.add_text(QPointF(x + 14, y - 10), label, color, size=14)
 
 
 def _refresh_overlays(
@@ -161,6 +155,15 @@ class IRVISAnnotatorPanel(QWidget):
         )
         self.vis_browser.path_changed.connect(self._on_dir_changed)
         path_form.addRow(BodyLabel("VIS 目录:"), self.vis_browser)
+
+        # 标注输出
+        self.npz_browser = PathBrowser(
+            label="", mode="file",
+            file_filter="NPZ Files (*.npz);;All Files (*)",
+            placeholder="标注文件保存路径（.npz）...",
+            config_key="irvis_npz_path",
+        )
+        path_form.addRow(BodyLabel("标注文件:"), self.npz_browser)
 
         layout.addWidget(path_card)
 
@@ -277,8 +280,12 @@ class IRVISAnnotatorPanel(QWidget):
             self.frame_label.setText("无可配对图像")
             return
 
-        # 尝试加载已有 .npz
-        self._load_path = str(Path(self.ir_browser.path) / "irvis_annotations.npz")
+        # 尝试加载已有 .npz（优先使用用户设定的路径，否则默认 IR 目录下）
+        npz_path = self.npz_browser.path.strip()
+        if not npz_path:
+            npz_path = str(Path(self.ir_browser.path) / "irvis_annotations.npz")
+            self.npz_browser.path = npz_path
+        self._load_path = npz_path
         existing = load_annotations(self._load_path)
 
         # 创建状态对象
@@ -446,15 +453,17 @@ class IRVISAnnotatorPanel(QWidget):
         # 先保存当前帧的标注
         self._state._save_current()
 
+        save_path = self.npz_browser.path.strip() or self._load_path
         count = save_annotations(
-            self._load_path,
+            save_path,
             self._state.annotations,
             self._state.pairs,
         )
         if count > 0:
+            self._load_path = save_path
             InfoBar.success(
                 title="保存成功",
-                content=f"已保存 {count} 帧标注 → {self._load_path}",
+                content=f"已保存 {count} 帧标注 → {save_path}",
                 orient=Qt.Orientation.Horizontal,
                 isClosable=True,
                 duration=3000,
@@ -493,6 +502,7 @@ class IRVISAnnotatorPanel(QWidget):
         """扫描期间禁用输入"""
         self.ir_browser.setEnabled(enabled)
         self.vis_browser.setEnabled(enabled)
+        self.npz_browser.setEnabled(enabled)
         self.undo_btn.setEnabled(enabled and self._state is not None)
         self.prev_btn.setEnabled(enabled and self._state is not None)
         self.next_btn.setEnabled(enabled and self._state is not None)
@@ -503,6 +513,7 @@ class IRVISAnnotatorPanel(QWidget):
     def _load_settings(self) -> None:
         self.ir_browser.path = get_str("irvis_ir_dir")
         self.vis_browser.path = get_str("irvis_vis_dir")
+        self.npz_browser.path = get_str("irvis_npz_path")
         # 如果两个路径都已持久化，启动时自动扫描
         if self.ir_browser.path.strip() and self.vis_browser.path.strip():
             self._try_scan()

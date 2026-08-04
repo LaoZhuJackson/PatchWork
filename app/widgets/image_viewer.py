@@ -96,6 +96,17 @@ class ImageViewer(QGraphicsView):
     def clear_overlays(self) -> None:
         self._clear_overlays()
 
+    def add_text(self, pos: QPointF, text: str, color: QColor = QColor("#FFFFFF"),
+                 size: int = 12) -> None:
+        """叠加纯文字（用于标注编号等）"""
+        font = QFont("Microsoft YaHei", size)
+        item = self._scene.addSimpleText(text, font)
+        item.setBrush(QBrush(color))
+        item.setPen(QPen(color))
+        item.setPos(pos)
+        item.setFlag(QGraphicsSimpleTextItem.GraphicsItemFlag.ItemIgnoresTransformations, False)
+        self._overlay_items.append(item)
+
     def add_bbox(self, rect: QRectF, color: QColor = QColor("#FF6B6B"), label: str = "",
                  line_width: float = 2.0) -> None:
         """叠加一个矩形检测框"""

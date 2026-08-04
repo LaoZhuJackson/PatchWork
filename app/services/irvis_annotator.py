@@ -1,6 +1,7 @@
 """IR-VIS 控制点标注：文件配对 + 标注状态管理 + npz 持久化"""
 from __future__ import annotations
 
+import io
 import re
 from pathlib import Path
 
@@ -246,7 +247,8 @@ def load_annotations(path: str | Path) -> dict[str, dict]:
         return {}
 
     try:
-        data = np.load(str(path), allow_pickle=True)
+        # 用 BytesIO 绕过 np.load 在 Windows 上对中文路径的 C 层 fopen 问题
+        data = np.load(io.BytesIO(path.read_bytes()), allow_pickle=True)
     except (OSError, ValueError) as exc:
         logger.warning("无法加载标注文件 %s: %s", path, exc)
         return {}
@@ -297,6 +299,9 @@ def save_annotations(
     data["vis_dir"] = str(pairs[0].vis_path.parent)
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(str(path), **data)
+    # BytesIO 绕开 np.savez_compressed 在 Windows 上中文路径的 C 层 fopen 问题
+    buf = io.BytesIO()
+    np.savez_compressed(buf, **data)
+    path.write_bytes(buf.getvalue())
     logger.info("保存 %d 帧标注 → %s", len(saved_frames), path)
     return len(saved_frames)
