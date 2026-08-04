@@ -49,23 +49,23 @@ def scan_pairs(
     ir_dir = Path(ir_dir)
     vis_dir = Path(vis_dir)
 
-    # 扫描 IR
+    # 扫描 IR — key = 前缀_帧号（确保不同视频的同帧号不冲突）
     ir_map: dict[str, Path] = {}
     for f in ir_dir.iterdir():
         if f.is_file() and f.suffix.lower() in IMAGE_EXTS:
             if m := IR_RE.match(f.name):
-                ir_map[m.group(2)] = f
+                ir_map[f"{m.group(1)}_{m.group(2)}"] = f
 
     # 扫描 VIS
     vis_map: dict[str, Path] = {}
     for f in vis_dir.iterdir():
         if f.is_file() and f.suffix.lower() in IMAGE_EXTS:
             if m := VIS_RE.match(f.name):
-                vis_map[m.group(2)] = f
+                vis_map[f"{m.group(1)}_{m.group(2)}"] = f
 
-    # 配对 — 取帧号交集
+    # 配对 — 前缀+帧号 的交集
     common = sorted(set(ir_map) & set(vis_map))
-    pairs = [IRVISPair(f, ir_map[f], vis_map[f]) for f in common]
+    pairs = [IRVISPair(key, ir_map[key], vis_map[key]) for key in common]
 
     unpaired_ir = sorted(set(ir_map) - set(vis_map))
     unpaired_vis = sorted(set(vis_map) - set(ir_map))
