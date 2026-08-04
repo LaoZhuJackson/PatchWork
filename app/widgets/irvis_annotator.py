@@ -31,8 +31,8 @@ from app.utils.logger import get_logger
 logger = get_logger(__name__)
 
 # ── 常量 ──
-GREEN = QColor(0, 200, 80)
-YELLOW = QColor(0, 255, 255)
+RED = QColor(255, 60, 60)
+YELLOW = QColor(255, 200, 0)
 CROSS_SIZE = 20     # 十字线半长（像素）
 
 
@@ -74,8 +74,8 @@ def _refresh_overlays(
     # 已完成的对 — 绿色 + 编号
     for i, (ir_pt, vis_pt) in enumerate(zip(state.ir_pts, state.vis_pts)):
         num = str(i + 1)
-        _draw_cross(ir_viewer, ir_pt[0], ir_pt[1], GREEN, num)
-        _draw_cross(vis_viewer, vis_pt[0], vis_pt[1], GREEN, num)
+        _draw_cross(ir_viewer, ir_pt[0], ir_pt[1], RED, num)
+        _draw_cross(vis_viewer, vis_pt[0], vis_pt[1], RED, num)
 
     # pending IR 点 — 黄色 + 无编号
     if state.pending_ir is not None:

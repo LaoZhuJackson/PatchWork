@@ -295,8 +295,6 @@ def save_annotations(
         return 0
 
     data["frames"] = np.array(saved_frames, dtype=str)
-    data["ir_dir"] = str(pairs[0].ir_path.parent)
-    data["vis_dir"] = str(pairs[0].vis_path.parent)
 
     path.parent.mkdir(parents=True, exist_ok=True)
     # BytesIO 绕开 np.savez_compressed 在 Windows 上中文路径的 C 层 fopen 问题
