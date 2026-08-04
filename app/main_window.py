@@ -102,6 +102,11 @@ class MainWindow(FluentWindow):
 
         self._register_navigation()
 
+        # 隐藏导航栏滚动条（保留滚轮滚动能力）
+        self.navigationInterface.panel.scrollArea.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+
         # 加载完毕，关闭splash
         self.splashScreen.finish()
 
