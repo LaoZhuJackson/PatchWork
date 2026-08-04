@@ -172,7 +172,7 @@ class IRVISAnnotatorPanel(QWidget):
 
         # 标注输出
         self.npz_browser = PathBrowser(
-            label="", mode="file",
+            label="", mode="save",
             file_filter="NPZ Files (*.npz);;All Files (*)",
             placeholder="标注文件保存路径（.npz）...",
             config_key="irvis_npz_path",

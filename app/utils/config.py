@@ -44,3 +44,8 @@ def get_float(key: str, default: float = 0.0) -> float:
 
 def set_float(key: str, value: float) -> None:
     SETTINGS.setValue(key, value)
+
+
+def remove_str(key: str) -> None:
+    """删除配置项（用于路径清空等场景）"""
+    SETTINGS.remove(key)
