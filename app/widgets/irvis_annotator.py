@@ -73,21 +73,26 @@ def _refresh_overlays(
     ir_viewer: ImageViewer,
     vis_viewer: ImageViewer,
     state: IRVISState,
+    ir_scale: float = 1.0,
+    vis_scale: float = 1.0,
 ) -> None:
-    """清除并重绘两个 viewer 上的所有控制点标记"""
+    """清除并重绘两个 viewer 上的所有控制点标记
+
+    state 中存储的是原始图像坐标，绘制时需要除以 scale 映射到显示坐标。
+    """
     ir_viewer.clear_overlays()
     vis_viewer.clear_overlays()
 
-    # 已完成的对 — 绿色 + 编号
+    # 已完成的对 — 绿色十字 + 红色编号
     for i, (ir_pt, vis_pt) in enumerate(zip(state.ir_pts, state.vis_pts)):
         num = str(i + 1)
-        _draw_cross(ir_viewer, ir_pt[0], ir_pt[1], GREEN, num)
-        _draw_cross(vis_viewer, vis_pt[0], vis_pt[1], GREEN, num)
+        _draw_cross(ir_viewer, ir_pt[0] / ir_scale, ir_pt[1] / ir_scale, GREEN, num)
+        _draw_cross(vis_viewer, vis_pt[0] / vis_scale, vis_pt[1] / vis_scale, GREEN, num)
 
-    # pending IR 点 — 黄色 + 无编号
+    # pending IR 点 — 金色 + 无编号
     if state.pending_ir is not None:
         x, y = state.pending_ir
-        _draw_cross(ir_viewer, x, y, YELLOW)
+        _draw_cross(ir_viewer, x / ir_scale, y / ir_scale, YELLOW)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -127,6 +132,8 @@ class IRVISAnnotatorPanel(QWidget):
         self._state: IRVISState | None = None
         self._scan_worker: ScanWorker | None = None
         self._load_path: str = ""   # 已有的 .npz 文件路径
+        self._ir_scale: float = 1.0
+        self._vis_scale: float = 1.0
 
         self._setup_ui()
         self._load_settings()
@@ -333,26 +340,33 @@ class IRVISAnnotatorPanel(QWidget):
             return
 
         pair = self._state.current_pair
-        ir_img = cv2.imread(str(pair.ir_path))
-        vis_img = cv2.imread(str(pair.vis_path))
+        ir_orig = cv2.imread(str(pair.ir_path))
+        vis_orig = cv2.imread(str(pair.vis_path))
 
-        if ir_img is None:
+        if ir_orig is None:
             error("读取失败", f"无法读取 IR 图像:\n{pair.ir_path}", self)
             return
-        if vis_img is None:
+        if vis_orig is None:
             error("读取失败", f"无法读取 VIS 图像:\n{pair.vis_path}", self)
             return
 
+        # 记录原始尺寸和缩放比（用于坐标映射）
+        self._ir_orig_h, self._ir_orig_w = ir_orig.shape[:2]
+        self._vis_orig_h, self._vis_orig_w = vis_orig.shape[:2]
+
         # 统一高度 (720px) 便于并排对比
         h_target = 720
-        ir_img = _resize_to_height(ir_img, h_target)
-        vis_img = _resize_to_height(vis_img, h_target)
+        ir_img = _resize_to_height(ir_orig, h_target)
+        vis_img = _resize_to_height(vis_orig, h_target)
+        self._ir_scale = self._ir_orig_h / h_target
+        self._vis_scale = self._vis_orig_h / h_target
 
         self.ir_viewer.set_image(_cv_to_qpixmap(ir_img))
         self.vis_viewer.set_image(_cv_to_qpixmap(vis_img))
 
-        # 重绘控制点
-        _refresh_overlays(self.ir_viewer, self.vis_viewer, self._state)
+        # 重绘控制点（坐标从原图空间映射到显示空间）
+        _refresh_overlays(self.ir_viewer, self.vis_viewer, self._state,
+                          self._ir_scale, self._vis_scale)
 
         # 更新状态栏
         self._update_status()
@@ -386,10 +400,13 @@ class IRVISAnnotatorPanel(QWidget):
     def _on_ir_clicked(self, scene_pos: QPointF) -> None:
         if self._state is None:
             return
-        # scene_pos 是 QGraphicsScene 坐标, 等价于图像像素坐标
-        added, _ = self._state.add_point(scene_pos.x(), scene_pos.y(), is_ir=True)
+        # 显示坐标 → 原始图像坐标
+        orig_x = scene_pos.x() * self._ir_scale
+        orig_y = scene_pos.y() * self._ir_scale
+        added, _ = self._state.add_point(orig_x, orig_y, is_ir=True)
         if added:
-            _refresh_overlays(self.ir_viewer, self.vis_viewer, self._state)
+            _refresh_overlays(self.ir_viewer, self.vis_viewer, self._state,
+                              self._ir_scale, self._vis_scale)
             self._update_status()
             self.undo_btn.setEnabled(True)
 
@@ -399,14 +416,18 @@ class IRVISAnnotatorPanel(QWidget):
         # 没有 pending IR 点时忽略 VIS 点击
         if self._state.pending_ir is None:
             return
-        added, ir_pt = self._state.add_point(scene_pos.x(), scene_pos.y(), is_ir=False)
+        # 显示坐标 → 原始图像坐标
+        orig_x = scene_pos.x() * self._vis_scale
+        orig_y = scene_pos.y() * self._vis_scale
+        added, ir_pt = self._state.add_point(orig_x, orig_y, is_ir=False)
         if added and ir_pt:
             n = len(self._state.ir_pts)
             logger.info(
                 "[%d] IR (%.0f, %.0f) ↔ VIS (%.0f, %.0f)",
-                n, ir_pt[0], ir_pt[1], scene_pos.x(), scene_pos.y(),
+                n, ir_pt[0], ir_pt[1], orig_x, orig_y,
             )
-            _refresh_overlays(self.ir_viewer, self.vis_viewer, self._state)
+            _refresh_overlays(self.ir_viewer, self.vis_viewer, self._state,
+                              self._ir_scale, self._vis_scale)
             self._update_status()
             self.save_btn.setEnabled(True)
 
@@ -416,7 +437,8 @@ class IRVISAnnotatorPanel(QWidget):
         if self._state is None:
             return
         if self._state.undo():
-            _refresh_overlays(self.ir_viewer, self.vis_viewer, self._state)
+            _refresh_overlays(self.ir_viewer, self.vis_viewer, self._state,
+                              self._ir_scale, self._vis_scale)
             self._update_status()
             self.undo_btn.setEnabled(
                 self._state.current_point_count() > 0 or self._state.pending_ir is not None
