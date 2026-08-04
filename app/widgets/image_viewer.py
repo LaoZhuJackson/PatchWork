@@ -99,7 +99,8 @@ class ImageViewer(QGraphicsView):
     def add_text(self, pos: QPointF, text: str, color: QColor = QColor("#FFFFFF"),
                  size: int = 12) -> None:
         """叠加纯文字（用于标注编号等）"""
-        font = QFont("Microsoft YaHei", size)
+        font = QFont()
+        font.setPointSize(size)
         item = self._scene.addSimpleText(text, font)
         item.setBrush(QBrush(color))
         item.setPen(QPen(color))
@@ -116,7 +117,8 @@ class ImageViewer(QGraphicsView):
         self._overlay_items.append(item)
 
         if label:
-            font = QFont("Microsoft YaHei", 10)
+            font = QFont()
+            font.setPointSize(10)
             text = self._scene.addSimpleText(label, font)
             text.setBrush(QBrush(color))
             text.setPen(QPen(color))
@@ -133,7 +135,8 @@ class ImageViewer(QGraphicsView):
         self._overlay_items.append(poly)
 
         if label and points:
-            font = QFont("Microsoft YaHei", 10)
+            font = QFont()
+            font.setPointSize(10)
             text = self._scene.addSimpleText(label, font)
             text.setBrush(QBrush(color))
             text.setPen(QPen(color))
