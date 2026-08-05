@@ -114,6 +114,7 @@ class ImageCompositor:
         flip_v_prob: float = 0.0,
         contrast_range: tuple[float, float] = (0.8, 1.2),
         class_id: int = 0,
+        opacity: float = 1.0,
     ) -> None:
         self.instances = sorted(instance_dir.glob("*.png"))
         if not self.instances:
@@ -131,7 +132,7 @@ class ImageCompositor:
         self._flip_v_prob = flip_v_prob
         self.contrast_range = contrast_range
         self.class_id = class_id
-
+        self._opacity = opacity
     @property
     def instance_count(self) -> int:
         return len(self.instances)
@@ -181,12 +182,23 @@ class ImageCompositor:
 
             # ── 融合 ──
             alpha = instance[:, :, 3]
+            # 腐蚀
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+            alpha = cv2.erode(alpha, kernel, iterations=1)
+
+            # 羽化
+            alpha = cv2.GaussianBlur(alpha, (5, 5), 1,5)
+
+            # 应用不透明度
+            if self._opacity < 1.0:
+                alpha = (alpha.astype(np.float32) * self._opacity).astype(np.uint8)
+
             fg = instance[:, :, :3]
             roi = target[y:y + h_i, x:x + w_i]
 
             if self._blend_mode == "poisson":
                 # 泊松融合：需要 mask（alpha>0 的区域）
-                mask = (alpha > 30).astype(np.uint8) * 255
+                mask = alpha
                 center = (x + w_i // 2, y + h_i // 2)
                 try:
                     # 转为 3 通道灰度供 seamlessClone 用

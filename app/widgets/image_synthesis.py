@@ -305,6 +305,16 @@ class ImageSynthesisPanel(QWidget):
         )
         row2.addWidget(self.pixel_size_spin)
 
+        row2.addWidget(BodyLabel("不透明度:"))
+        self.synth_opacity = DoubleSpinBox()
+        self.synth_opacity.setRange(0.0, 1.0)
+        self.synth_opacity.setSingleStep(0.05)
+        self.synth_opacity.setDecimals(2)
+        self.synth_opacity.setValue(1.0)
+        self.synth_opacity.valueChanged.connect(lambda v: set_float("synth_opacity", v))
+        row2.addWidget(self.synth_opacity)
+
+
         row2.addStretch()
         ly.addLayout(row2)
 
@@ -728,6 +738,7 @@ class ImageSynthesisPanel(QWidget):
         self.scale_min.setValue(get_float("syn_scale_min", 0.5))
         self.scale_max.setValue(get_float("syn_scale_max", 1.5))
         self.pixel_size_spin.setValue(get_int("syn_pixel_size", 200))
+        self.synth_opacity.setValue(get_float("synth_opacity", 1.0))
 
         # 色阶模式
         color_mode = get_int("syn_color_mode", 2)  # 默认保持
