@@ -173,6 +173,12 @@ class ImageCompositor:
             instance = _augment(instance, scale, angle, contrast,
                                 blur_sigma, flip_h, flip_v)
             h_i, w_i = instance.shape[:2]
+            min_dim = min(h_i, w_i)
+
+            # 核大小 = 实例短边的 1/20，最小 1，最大 5
+            ks = max(1, min(5, min_dim // 20))
+            if ks % 2 == 0:
+                ks += 1 # 保持奇数
 
             if h_i >= h_t or w_i >= w_t:
                 continue
@@ -183,11 +189,13 @@ class ImageCompositor:
             # ── 融合 ──
             alpha = instance[:, :, 3]
             # 腐蚀
-            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-            alpha = cv2.erode(alpha, kernel, iterations=1)
+            if ks >= 3:
+                kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (ks, ks))
+                alpha = cv2.erode(alpha, kernel, iterations=1)
 
             # 羽化
-            alpha = cv2.GaussianBlur(alpha, (5, 5), 1,5)
+            sigma = ks / 3.0
+            alpha = cv2.GaussianBlur(alpha, (ks, ks), sigma)
 
             # 应用不透明度
             if self._opacity < 1.0:
