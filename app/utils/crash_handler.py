@@ -39,6 +39,7 @@ def _qt_message_handler(msg_type, context, message):
             "libpng warning", "iccp",
             "known incorrect srgb",
             "qt.svg.link",
+            "qfont::setpointsize",  # 字体点大小<=0 的无害警告
         ]
         if any(k in msg_lower for k in skip_keywords):
             return
