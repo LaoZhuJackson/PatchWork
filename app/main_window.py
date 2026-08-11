@@ -30,6 +30,7 @@ from app.widgets.xanylabeling import XAnyLabelingPanel
 from app.widgets.pseudo_thermal import PseudoThermalPanel
 from app.widgets.irvis_annotator import IRVISAnnotatorPanel
 from app.widgets.icafusion_infer import ICAFusionInferPanel
+from app.widgets.icafusion_prepare import ICAFusionPreparePanel
 
 from pathlib import Path
 
@@ -83,6 +84,7 @@ class MainWindow(FluentWindow):
             "pseudo_thermal": PseudoThermalPanel(),
             "irvis_annotator": IRVISAnnotatorPanel(),
             "icafusion_infer": ICAFusionInferPanel(),
+            "icafusion_prepare": ICAFusionPreparePanel(),
         }
 
         for name, widget in self._placeholder.items():
@@ -190,6 +192,11 @@ class MainWindow(FluentWindow):
         self.addSubInterface(
             self._placeholder["icafusion_infer"],
             FIF.ALBUM, "ICAFusion 推理",
+            position=NavigationItemPosition.SCROLL,
+        )
+        self.addSubInterface(
+            self._placeholder["icafusion_prepare"],
+            FIF.TILES, "ICAFusion 数据准备",
             position=NavigationItemPosition.SCROLL,
         )
         self.addSubInterface(

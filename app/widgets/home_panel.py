@@ -31,6 +31,7 @@ _MODULES = [
     (FIF.PHOTO, "模型推理", "YOLO 模型加载 + 单图推理 + 结果叠加"),
     (FIF.ZOOM, "SAHI 推理", "切片辅助推理，提升小目标检测精度"),
     (FIF.ALBUM, "推理对比", "多推理方式对比评测，输出每类 P/R/F1 表格"),
+    (FIF.TILES, "ICAFusion 数据准备", "IR 对齐 + VIS 裁剪，生成 ICAFusion 输入"),
     (FIF.SAVE_AS, "导出ONNX", ".pt → ONNX 转换"),
     (FIF.TILES, "Label预览", "YOLO 标注文件可视化预览"),
     (FIF.LINK, "X-AnyLabeling", "一键启动外部标注工具"),
