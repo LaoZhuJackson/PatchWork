@@ -99,6 +99,15 @@ class ModelInferPanel(QWidget):
         self.model_browser.path_changed.connect(self._load_model)
         toolbar.addWidget(self.model_browser)
 
+        # 加载按钮（启动不再自动加载，由用户显式触发）
+        load_row = QHBoxLayout()
+        self.load_btn = PrimaryPushButton("加载模型")
+        self.load_btn.setToolTip("加载当前模型文件（启动不再自动加载）")
+        self.load_btn.clicked.connect(self._on_load_clicked)
+        load_row.addWidget(self.load_btn)
+        load_row.addStretch()
+        toolbar.addLayout(load_row)
+
         # 图片目录
         self.folder_browser = PathBrowser(
             label="图片目录:", mode="dir",
@@ -155,6 +164,13 @@ class ModelInferPanel(QWidget):
         layout.addWidget(self.browser, 1)
 
     # ---- 模型加载 ----
+
+    def _on_load_clicked(self) -> None:
+        p = self.model_browser.path
+        if p and Path(p).is_file():
+            self._load_model(p)
+        else:
+            error("无法加载", "请先选择有效的模型文件", self)
 
     def _load_model(self, path: str) -> None:
         self.status_label.setText("正在加载模型...")
@@ -290,9 +306,7 @@ class ModelInferPanel(QWidget):
         self.conf_spin.setValue(get_float("infer_conf", 0.25))
         self.iou_spin.setValue(get_float("infer_iou", 0.45))
 
-        model_path = get_str("infer_model_path")
-        if model_path and Path(model_path).is_file():
-            self._load_model(model_path)
+        # 仅恢复路径，不自动加载模型（避免每次启动加载 YOLO 权重拖慢启动）
 
         folder = get_str("infer_folder_path")
         if folder:

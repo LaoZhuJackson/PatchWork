@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QIcon, QPixmap
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QVBoxLayout, QWidget
 from qfluentwidgets import (
     FluentWindow, NavigationItemPosition, setTheme, Theme,
     ScrollArea, SplashScreen,
@@ -39,6 +39,43 @@ _ICON_PATH = (
     Path(__file__).resolve().parent.parent / "resources" / "icon.svg"
 )
 
+
+class LazyPage(QWidget):
+    """占位页：首次显示时才构造真实面板，避免启动时全量加载模型/扫描目录。
+
+    用法：LazyPage(lambda: ModelInferPanel(), "model_infer")
+    """
+
+    def __init__(self, factory, name: str = "") -> None:
+        super().__init__()
+        self.setObjectName(name)
+        self._factory = factory
+        self._body: QWidget | None = None
+        self._layout = QVBoxLayout(self)
+        self._layout.setContentsMargins(0, 0, 0, 0)
+
+    def showEvent(self, e) -> None:
+        super().showEvent(e)
+        if self._body is None:
+            self._build()
+
+    def _build(self) -> None:
+        panel = self._factory()
+        scroll = ScrollArea()
+        scroll.setObjectName(self.objectName())
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(panel)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setStyleSheet(
+            "QScrollArea { background: transparent; border: none; }"
+            "QScrollArea > QWidget > QWidget { background: transparent; }"
+        )
+        scroll.viewport().setStyleSheet("background: transparent;")
+        self._body = scroll
+        self._layout.addWidget(scroll)
+        self._body.show()
+
+
 class MainWindow(FluentWindow):
     def __init__(self) -> None:
         super().__init__()
@@ -65,39 +102,49 @@ class MainWindow(FluentWindow):
         self.navigationInterface.setReturnButtonVisible(False)
         self.navigationInterface.setExpandWidth(160)
 
-        self._placeholder = {
-            "home": HomePanel(),
-            "image_synthesis": ImageSynthesisPanel(),
-            "dataset_split": DatasetSplitPanel(),
-            "model_infer": ModelInferPanel(),
-            "label_preview": LabelPreviewPanel(),
-            "export_onnx": ExportONNXPanel(),
-            "video_extract": VideoExtractPanel(),
-            "gpu_monitor": GPUMonitorPanel(),
-            "xanylabeling": XAnyLabelingPanel(),
-            "sahi_infer": SahiInferPanel(),
-            "benchmark": BenchmarkPanel(),
-            "open_vocab_detect": OpenVocabDetectPanel(),
-            "ndjson_convert": NDJSONConvertPanel(),
-            "framediff_dataset": FrameDiffDatasetPanel(),
-            "json_manager": JsonManagerPanel(),
-            "presentation": PresentationPanel(),
-            "pseudo_thermal": PseudoThermalPanel(),
-            "irvis_annotator": IRVISAnnotatorPanel(),
-            "icafusion_infer": ICAFusionInferPanel(),
-            "icafusion_prepare": ICAFusionPreparePanel(),
-            "callback_dump": CallbackDumpPanel(),
+        # 首页 + 轻量页立即构造；含模型/重任务的面板首访才构造（LazyPage 懒加载）
+        eager = {
+            "home": HomePanel,
+            "callback_dump": CallbackDumpPanel,
+            "presentation": PresentationPanel,
+            "json_manager": JsonManagerPanel,
+            "dataset_split": DatasetSplitPanel,
+            "gpu_monitor": GPUMonitorPanel,
+            "video_extract": VideoExtractPanel,
+            "ndjson_convert": NDJSONConvertPanel,
+            "export_onnx": ExportONNXPanel,
+            "label_preview": LabelPreviewPanel,
+            "xanylabeling": XAnyLabelingPanel,
         }
+        lazy = {
+            "image_synthesis": ImageSynthesisPanel,
+            "model_infer": ModelInferPanel,
+            "benchmark": BenchmarkPanel,
+            "open_vocab_detect": OpenVocabDetectPanel,
+            "framediff_dataset": FrameDiffDatasetPanel,
+            "irvis_annotator": IRVISAnnotatorPanel,
+            "icafusion_infer": ICAFusionInferPanel,
+            "icafusion_prepare": ICAFusionPreparePanel,
+            "sahi_infer": SahiInferPanel,
+            "pseudo_thermal": PseudoThermalPanel,
+        }
+
+        self._placeholder: dict[str, QWidget] = {}
+        for name, cls in eager.items():
+            self._placeholder[name] = cls()
+        for name, cls in lazy.items():
+            self._placeholder[name] = LazyPage(cls, name)
 
         for name, widget in self._placeholder.items():
             widget.setObjectName(name)
 
-        # 将所有面板包进 ScrollArea
-        for name, panel in list(self._placeholder.items()):
+        # 立即构造的面板包进 ScrollArea（与原来一致）；LazyPage 内部自管 ScrollArea
+        for name in eager:
+            widget = self._placeholder[name]
             scroll = ScrollArea()
             scroll.setObjectName(name)
             scroll.setWidgetResizable(True)
-            scroll.setWidget(panel)
+            scroll.setWidget(widget)
             scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
             scroll.setStyleSheet(
                 "QScrollArea { background: transparent; border: none; }"

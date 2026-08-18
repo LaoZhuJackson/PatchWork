@@ -115,6 +115,11 @@ class OpenVocabDetectPanel(QWidget):
         self.model_combo.currentTextChanged.connect(self._on_model_variant_changed)
         model_row.addWidget(self.model_combo, 1)
 
+        self.load_model_btn = PrimaryPushButton("加载模型")
+        self.load_model_btn.setToolTip("加载当前模型（启动不再自动加载）")
+        self.load_model_btn.clicked.connect(self._on_load_clicked)
+        model_row.addWidget(self.load_model_btn)
+
         self.custom_model_browser = PathBrowser(
             label="", mode="file",
             file_filter="Model Files (*.pt *.pth);;All Files (*)",
@@ -241,6 +246,18 @@ class OpenVocabDetectPanel(QWidget):
         if filename:
             set_str("ovd_model_variant", text)
             self._load_model(filename)
+
+    def _on_load_clicked(self) -> None:
+        """显式加载当前选中的模型（启动不再自动加载）"""
+        idx = self.model_combo.currentIndex()
+        if 0 <= idx < len(YOLOE_VARIANT_NAMES):
+            self._load_model(YOLOE_VARIANTS[YOLOE_VARIANT_NAMES[idx]])
+        else:
+            p = self.custom_model_browser.path
+            if p:
+                self._load_model(p)
+            else:
+                error("无法加载", "请选择模型变体或自定义模型路径", self)
 
     def _load_model(self, model_name_or_path: str) -> None:
         """后台加载模型（支持自动下载）"""
@@ -507,14 +524,7 @@ class OpenVocabDetectPanel(QWidget):
         if custom_path:
             self.custom_model_browser.path = custom_path
 
-        # 启动时预加载模型
-        idx = self.model_combo.currentIndex()
-        if 0 <= idx < len(YOLOE_VARIANT_NAMES):
-            # 预设 YOLOE 变体
-            self._load_model(YOLOE_VARIANTS[YOLOE_VARIANT_NAMES[idx]])
-        elif idx == len(YOLOE_VARIANT_NAMES) and custom_path:
-            # 上次选了"自定义模型..."
-            self._load_model(custom_path)
+        # 启动不再预加载模型（避免每次启动加载大模型拖慢速度，进入面板后由用户显式加载）
 
         # 图片目录
         saved_folder = get_str("ovd_folder_path")

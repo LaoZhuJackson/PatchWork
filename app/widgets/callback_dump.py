@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QListWidget,
     QListWidgetItem,
-    QTabWidget,
+    QStackedWidget,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -21,8 +21,10 @@ from qfluentwidgets import (
     LineEdit,
     PrimaryPushButton,
     PushButton,
+    SegmentedWidget,
     SpinBox,
     SubtitleLabel,
+    TextEdit,
 )
 
 from app.services.callback_dump import CallbackDumper
@@ -62,18 +64,18 @@ class CallbackDumpPanel(QWidget):
         # 端口 / 路由 / 落盘
         row = QHBoxLayout()
         row.setSpacing(12)
-        row.addWidget(BodyLabel("端口:"))
-        self.port_spin = SpinBox()
-        self.port_spin.setRange(1, 65535)
-        self.port_spin.setValue(9999)
-        self.port_spin.setFixedWidth(90)
-        row.addWidget(self.port_spin)
 
         row.addWidget(BodyLabel("监听路由:"))
         self.route_edit = LineEdit()
         self.route_edit.setPlaceholderText("留空接收全部，如 /cb")
         self.route_edit.setFixedWidth(180)
         row.addWidget(self.route_edit)
+
+        row.addWidget(BodyLabel("端口:"))
+        self.port_spin = SpinBox()
+        self.port_spin.setRange(1, 65535)
+        self.port_spin.setValue(9999)
+        row.addWidget(self.port_spin)
 
         row.addWidget(BodyLabel("落盘文件:"))
         self.dump_edit = LineEdit()
@@ -123,21 +125,37 @@ class CallbackDumpPanel(QWidget):
         list_lay.addWidget(self.list_widget)
         layout.addWidget(list_card, 1)
 
-        # ── 详情卡片 ──
+        # ── 详情卡片（SegmentedWidget 顶部导航 + QStackedWidget，参考 qfluentwidgets demo） ──
         detail_card = CardWidget()
         detail_lay = QVBoxLayout(detail_card)
         detail_lay.setContentsMargins(12, 8, 12, 12)
         detail_lay.addWidget(BodyLabel("请求详情"))
-        self.tabs = QTabWidget()
-        self.headers_view = QTextEdit()
+
+        self.detail_seg = SegmentedWidget()
+        self.detail_stack = QStackedWidget()
+        self.headers_view = TextEdit()
         self.headers_view.setReadOnly(True)
         self.body_view = QTextEdit()
         self.body_view.setReadOnly(True)
-        self.tabs.addTab(self.headers_view, "Headers")
-        self.tabs.addTab(self.body_view, "Body")
-        detail_lay.addWidget(self.tabs)
+        self.addSubInterface(self.headers_view, "headers_tab", "Headers")
+        self.addSubInterface(self.body_view, "body_tab", "Body")
+
+        self.detail_stack.setCurrentWidget(self.headers_view)
+        self.detail_seg.setCurrentItem(self.headers_view.objectName())
+        self.detail_seg.currentItemChanged.connect(
+            lambda k: self.detail_stack.setCurrentWidget(self.findChild(QWidget, k))
+        )
+
+        detail_lay.addWidget(self.detail_seg)
+        detail_lay.addWidget(self.detail_stack)
         detail_card.setFixedHeight(240)
         layout.addWidget(detail_card)
+
+    def addSubInterface(self, widget: QWidget, object_name: str, text: str) -> None:
+        """向详情区添加一个 SegmentedWidget 导航项 + 对应内容页（对齐官方 demo 写法）"""
+        widget.setObjectName(object_name)
+        self.detail_stack.addWidget(widget)
+        self.detail_seg.addItem(routeKey=object_name, text=text)
 
     # ── 持久化 ────────────────────────────────────
 
