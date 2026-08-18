@@ -22,7 +22,7 @@ from qfluentwidgets import (
     SegmentedWidget,
     SpinBox,
     SubtitleLabel,
-    TextEdit,
+    TextEdit, ListWidget,
 )
 from qfluentwidgets.window.stacked_widget import StackedWidget
 
@@ -119,12 +119,12 @@ class CallbackDumpPanel(QWidget):
         list_lay = QVBoxLayout(list_card)
         list_lay.setContentsMargins(12, 8, 12, 12)
         list_lay.addWidget(BodyLabel("收到的请求"))
-        self.list_widget = QListWidget()
+        self.list_widget = ListWidget()
         self.list_widget.currentItemChanged.connect(self._show_detail)
         list_lay.addWidget(self.list_widget)
         layout.addWidget(list_card, 1)
 
-        # ── 详情卡片（SegmentedWidget 顶部导航 + QStackedWidget，参考 qfluentwidgets demo） ──
+        # ── 详情卡片 ──
         detail_card = CardWidget()
         detail_lay = QVBoxLayout(detail_card)
         detail_lay.setContentsMargins(12, 8, 12, 12)
@@ -147,8 +147,7 @@ class CallbackDumpPanel(QWidget):
 
         detail_lay.addWidget(self.detail_seg)
         detail_lay.addWidget(self.detail_stack)
-        detail_card.setFixedHeight(240)
-        layout.addWidget(detail_card)
+        layout.addWidget(detail_card, 2)
 
     def addSubInterface(self, widget: QWidget, object_name: str, text: str) -> None:
         """向详情区添加一个 SegmentedWidget 导航项 + 对应内容页（对齐官方 demo 写法）"""
