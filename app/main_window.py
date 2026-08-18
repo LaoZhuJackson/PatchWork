@@ -12,6 +12,7 @@ from qfluentwidgets import FluentIcon as FIF
 
 from app.utils.config import get_str, set_str
 from app.widgets.benchmark import BenchmarkPanel
+from app.widgets.callback_dump import CallbackDumpPanel
 from app.widgets.dataset_split import DatasetSplitPanel
 from app.widgets.export_onnx import ExportONNXPanel
 from app.widgets.framediff_dataset import FrameDiffDatasetPanel
@@ -85,6 +86,7 @@ class MainWindow(FluentWindow):
             "irvis_annotator": IRVISAnnotatorPanel(),
             "icafusion_infer": ICAFusionInferPanel(),
             "icafusion_prepare": ICAFusionPreparePanel(),
+            "callback_dump": CallbackDumpPanel(),
         }
 
         for name, widget in self._placeholder.items():
@@ -128,6 +130,12 @@ class MainWindow(FluentWindow):
             position=NavigationItemPosition.TOP,
         )
         # ----- 导航栏（可滚动区） -----
+        self.addSubInterface(
+            self._placeholder["callback_dump"],
+            FIF.GLOBE,
+            "回调捕获",
+            position=NavigationItemPosition.SCROLL,
+        )
         self.addSubInterface(
             self._placeholder["presentation"],
             FIF.PROJECTOR,

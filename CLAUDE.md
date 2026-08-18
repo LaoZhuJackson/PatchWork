@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Python >= 3.10** (conda env `patchwork`)
 - **GUI**: PySide6 + QFluentWidgets (`PySide6-Fluent-Widgets`), FluentWindow navigation, light/dark theme toggle
-- **ML**: ultralytics (YOLO/YOLOE) + supervision; also SAHI (`sahi`) for sliced inference
+- **ML**: ultralytics (YOLO/YOLOE/SAM) + supervision; also SAHI (`sahi`) for sliced inference; ICAFusion (external YOLOv5 TransFusion repo)
 - **Text encoding**: mobileclip (auto-installed by ultralytics for YOLOE)
 - **Video**: opencv-python (video extract, video tracking)
 - **SSH**: paramiko (GPU monitor)
@@ -40,10 +40,10 @@ app/
 │   └── tracking_adapter.py # wraps YOLO model.track()
 ├── widgets/                # one QWidget panel per feature; mutually independent
 │   ├── home_panel.py       # home page: banner + module cards
-│   ├── image_viewer.py     # QGraphicsView: zoom, pan, bbox/polygon/text overlays
+│   ├── image_viewer.py     # QGraphicsView: zoom, pan, overlays, click signal, pick/pan modes
 │   ├── thumbnail_list.py   # horizontal lazy-loading thumbnail strip (background thread)
 │   ├── image_browser.py    # composable: ThumbnailList + ImageViewer + nav buttons
-│   ├── path_browser.py     # reusable: label + LineEdit + browse btn (file/dir mode)
+│   ├── path_browser.py     # reusable: label + LineEdit + browse btn + clear btn (file/save/dir)
 │   ├── dataset_split.py    # F1: pairing check + train/val/test split (copy/move)
 │   ├── model_infer.py      # F2: model load + click-to-infer + conf/iou controls
 │   ├── label_preview.py    # F4: YOLO label overlay preview
@@ -52,10 +52,16 @@ app/
 │   ├── xanylabeling.py     # F7: subprocess launch X-AnyLabeling
 │   ├── video_extract.py    # F8: extract frames by time/frame interval
 │   ├── sahi_infer.py       # SAHI sliced inference panel
-│   ├── video_track.py      # video tracking panel (BoT-SORT / ByteTrack)
 │   ├── benchmark.py        # multi-adapter evaluation + comparison table
 │   ├── open_vocab_detect.py# YOLOE open-vocabulary: text prompts + zero-shot detect
-│   └── ndjson_convert.py   # NDJSON → YOLO format dataset conversion
+│   ├── ndjson_convert.py   # NDJSON → YOLO format dataset conversion
+│   ├── image_synthesis.py  # SAM background removal + compositing (white/black-hot, blend)
+│   ├── framediff_dataset.py# Frame Dynamics: 3-channel frame-diff dataset generation
+│   ├── json_manager.py     # JSON annotation manager (interval delete / empty generate)
+│   ├── presentation.py     # PPT 汇报: calls workspace make_slides.py (validate/inspect/build)
+│   ├── pseudo_thermal.py   # pseudo-thermal IR style transfer (cosine transform)
+│   ├── irvis_annotator.py  # IR-VIS control-point annotation (click-to-pair)
+│   └── icafusion_infer.py  # ICAFusion dual-stream VIS+IR inference panel
 ├── services/               # pure logic, no Qt imports; safe from Worker threads
 │   ├── splitter.py         # find_pairs() + split_dataset()
 │   ├── inference.py        # InferenceEngine: detect + seg, conf/iou params
@@ -66,15 +72,21 @@ app/
 │   ├── xanylabeling.py     # subprocess.Popen wrapper
 │   ├── video_extractor.py  # cv2 frame extraction
 │   ├── sahi_inference.py   # SahiInferenceService (AutoDetectionModel)
-│   ├── video_tracking.py   # VideoTrackingService (model.track)
 │   ├── benchmark.py        # BenchmarkRunner: iterate adapters × images → per-class metrics
 │   ├── ndjson_converter.py # asyncio wrapper: convert_ndjson_to_yolo()
-│   └── metrics.py          # hand-written IoU matching per class → P/R/F1/AP50
+│   ├── metrics.py          # hand-written IoU matching per class → P/R/F1/AP50
+│   ├── synthesis.py        # BackgroundRemover (SAM) + ImageCompositor (alpha/poisson/histogram)
+│   ├── framediff.py        # build_frame_dynamics() + generate_framediff_dataset()
+│   ├── json_manager.py     # scan/delete/generate X-AnyLabeling JSON by filename interval
+│   ├── presentation.py     # PresentationService: subprocess make_slides.py wrapper
+│   ├── pseudo_thermal.py   # PseudoThermalAug: cosine-transform RGB → pseudo-thermal
+│   ├── irvis_annotator.py  # scan_pairs() + IRVISState + npz save/load
+│   └── icafusion_inference.py # ICAFusionEngine: YOLOv5 TransFusion dual-stream infer
 └── utils/
     ├── worker.py           # Worker(QThread): override do_work(), signals finished/error/progress
     ├── logger.py           # logging setup + QtLogHandler (WARNING+ → popup)
     ├── message.py          # MessageBox wrappers: info/warning/error/confirm
-    ├── config.py           # QSettings("PatchWork","PatchWork") get/set for str/int/float/bool
+    ├── config.py           # QSettings("PatchWork","PatchWork") get/set/remove for str/int/float/bool
     └── crash_handler.py    # sys.excepthook + Qt message handler + faulthandler → log files
 ```
 
@@ -89,10 +101,12 @@ app/
 - **Colors.** `label_reader.get_color(class_id)` returns consistent per-class QColor from a 20-color list.
 - **Logging as user alerts.** WARNING+ log records pop up as MessageDialogs via `QtLogHandler`. For intentional dialogs use `app.utils.message`.
 - **Config persistence.** Every user setting saved via `app/utils/config.py` (QSettings). Restored in `_load_settings()`. Never persist SSH passwords.
-- **Panels.** Each is a self-contained QWidget with unique `setObjectName()`. Registered in `MainWindow._register_navigation()` via `addSubInterface(self._wrap(widget), ...)`. All panels wrapped in `ScrollArea` — content overflows scroll instead of growing the main window.
+- **Panels.** Each is a self-contained QWidget with unique `setObjectName()`. Registered in `MainWindow._register_navigation()` via `addSubInterface(self._placeholder[name], FIF.XXX, "标题", position=...)`. All panels are wrapped in a `ScrollArea` in `__init__` before registration — content overflows scroll instead of growing the main window.
+- **Navigation position.** Home stays `NavigationItemPosition.TOP` (fixed, non-scrollable). All feature modules use `NavigationItemPosition.SCROLL` (scrollable). Theme toggle uses `BOTTOM`. TOP/BOTTOM items are NOT inside the scroll area — only SCROLL items are. Each module should have a unique `FIF.*` icon.
 - **QLabel / QPushButton / QListWidget** can stay native — Fluent theme engine auto-styles them. Only use qfluentwidgets-specific controls (`CardWidget`, `BodyLabel`, `CheckBox`, `RadioButton`, `ComboBox`, `Slider`, `SpinBox`, `DoubleSpinBox`, `ScrollArea`, `FluentWindow`) when you need Fluent behavior.
 - **ImageBrowser** (`thumbnail_list.py` + `image_browser.py`) is the shared component for image list + viewer + prev/next buttons. Use it in any panel that browses images.
-- **PathBrowser** (`path_browser.py`) is the reusable file/directory selector. Use `PathBrowser(label="…", mode="file"|"dir", file_filter="…", config_key="…")` instead of manually wiring LineEdit + PushButton + QFileDialog. Connect `path_changed` signal for side effects (model loading, image scanning). Access current path via `.path` property. Set programmatically via `.path = "…"` (no signal emitted).
+- **PathBrowser** (`path_browser.py`) is the reusable file/directory selector. Use `PathBrowser(label="…", mode="file"|"save"|"dir", file_filter="…", config_key="…")` instead of manually wiring LineEdit + PushButton + QFileDialog. `mode="save"` uses `getSaveFileName` (allows non-existent filenames). A `×` clear button appears when a path is set — it clears the field and removes the QSettings key via `clear()`. Connect `path_changed` signal for side effects. Access via `.path` property. Set programmatically via `.path = "…"` (no signal emitted).
+- **ImageViewer interaction modes.** `set_interaction_mode("pan"|"pick")` — `"pan"` (default): left-drag pans, wheel zooms. `"pick"`: left-click emits `clicked(QPointF)` with scene coords, middle-drag pans, wheel zooms. Use `add_text(pos, text, color, size)` for plain-text labels, `add_bbox`/`add_polygon` for shapes, `clear_overlays()` to reset.
 - **YOLOE / OpenVocabEngine.** For open-vocabulary detection, use `OpenVocabEngine` (`open_vocab.py`). Flow: `load_model("yoloe-26n-seg.pt")` → `set_prompts(["person", "excavator"])` → `infer("img.jpg")`. `set_prompts()` calls `model.get_text_pe(names)` + `model.set_classes(names, tpe)` to encode text into detection head embeddings. Use non-pf model variants (e.g. `yoloe-26n-seg.pt`, not `-pf`). Text model `mobileclip2:b` auto-downloads on first use.
 - **NDJSON conversion.** `ndjson_converter.py` wraps ultralytics `convert_ndjson_to_yolo()` with `asyncio.run()`. Panel uses Worker pattern for async conversion in background thread.
 
@@ -108,5 +122,9 @@ app/
 - **YOLOE requires non-pf model.** Open-vocabulary text prompts need `yoloe-*-seg.pt` (NOT `yoloe-*-seg-pf.pt` which is prompt-free and locked to training classes). If `get_text_pe` is missing, the model doesn't support text prompts.
 - **`aiohttp` needed for NDJSON.** The NDJSON converter downloads remote images via aiohttp. Dependency listed in pyproject.toml.
 - **`mobileclip` auto-install.** YOLOE text encoding requires mobileclip; ultralytics auto-downloads it on first `get_text_pe()` call.
-- **PathBrowser config persistence.** When `config_key` is set, PathBrowser auto-saves on browse. Use `path = saved_value` in `_load_settings()` to restore (no signal emitted, unlike browsing).
+- **PathBrowser config persistence.** When `config_key` is set, PathBrowser auto-saves on browse. Use `path = saved_value` in `_load_settings()` to restore (no signal emitted, unlike browsing). Clearing a path also removes the QSettings key via `remove_str()`.
 - **ThumbnailList item text color.** Theme-aware via `_update_list_style()` connected to `qconfig.themeChanged`. Dark theme → white text, light theme → black text. New list-like widgets should follow the same pattern.
+- **npz Chinese path garbling.** `np.savez_compressed` / `np.load` use C-level `fopen` that garbles Chinese paths on Windows. Write/read via `io.BytesIO` (`path.write_bytes(buf.getvalue())` / `np.load(io.BytesIO(path.read_bytes()))`). Also avoid storing Chinese paths *inside* the npz with numpy `dtype=str` — it garbles too. `irvis_annotator.py` stores only frame IDs + point coords (no paths).
+- **IR-VIS pairing needs exact frame-number match.** `irvis_annotator.scan_pairs()` keys by `prefix + "_" + frame_number` (e.g. `DJI_..._0001_000042`), so different videos sharing frame numbers don't collide. IR and VIS must have *identical* frame numbers — they do NOT pair sequentially. If two cameras use different frame rates (mismatched frame numbers), nothing pairs; the data must be regenerated to align frame numbers.
+- **IR-VIS coordinate scaling.** Annotation points are stored in *original-image* pixel space. The panel resizes images to 720px for display, so clicks are mapped back by `orig_h / 720` before saving, and mapped back to display space when drawing overlays. Downstream tools must scale points by `orig_h / display_h` accordingly.
+- **Window sizing.** `FluentWindow` sizes to the largest page's `sizeHint()`, so `resize()` before `_register_navigation()` gets overridden. Fix: `self.setMinimumSize(900, 700)` in `__init__` (overrides layout minimum) and hide the nav scrollbar via `self.navigationInterface.panel.scrollArea.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)`.
