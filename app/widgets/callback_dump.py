@@ -9,8 +9,6 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QListWidget,
     QListWidgetItem,
-    QStackedWidget,
-    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -26,6 +24,7 @@ from qfluentwidgets import (
     SubtitleLabel,
     TextEdit,
 )
+from qfluentwidgets.window.stacked_widget import StackedWidget
 
 from app.services.callback_dump import CallbackDumper
 from app.utils.config import get_int, get_str, set_int, set_str
@@ -132,10 +131,10 @@ class CallbackDumpPanel(QWidget):
         detail_lay.addWidget(BodyLabel("请求详情"))
 
         self.detail_seg = SegmentedWidget()
-        self.detail_stack = QStackedWidget()
+        self.detail_stack = StackedWidget()
         self.headers_view = TextEdit()
         self.headers_view.setReadOnly(True)
-        self.body_view = QTextEdit()
+        self.body_view = TextEdit()
         self.body_view.setReadOnly(True)
         self.addSubInterface(self.headers_view, "headers_tab", "Headers")
         self.addSubInterface(self.body_view, "body_tab", "Body")
