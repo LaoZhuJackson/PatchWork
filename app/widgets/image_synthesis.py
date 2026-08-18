@@ -10,12 +10,15 @@ from PySide6.QtWidgets import (
     QButtonGroup, QHBoxLayout, QVBoxLayout, QWidget,
 )
 from qfluentwidgets import (
-    PushButton, PrimaryPushButton, ComboBox, ProgressBar,
+    PushButton, PrimaryPushButton, ComboBox, ProgressBar, LineEdit,
     BodyLabel, StrongBodyLabel, SubtitleLabel,
     CardWidget, SpinBox, DoubleSpinBox, RadioButton, CheckBox,
 )
 
 from app.services.label_reader import IMAGE_EXTS, get_color
+from app.services.sd_refine import (
+    DEFAULT_MODEL_ID, DEFAULT_PROMPT, DEFAULT_NEGATIVE_PROMPT, DEFAULT_PROXY,
+)
 from app.services.synthesis import (
     BackgroundRemover, ImageCompositor, SAM_VARIANTS, SAM_VARIANT_NAMES,
     merge_labels,
@@ -66,6 +69,8 @@ class CompositeWorker(Worker):
         label_dir: Path | None,
         merge_label_dir: Path | None,
         num_per_image: int,
+        mask_out_dir: Path | None = None,
+        sd_params: dict | None = None,
     ) -> None:
         super().__init__()
         self.compositor = compositor
@@ -74,13 +79,32 @@ class CompositeWorker(Worker):
         self.label_dir = label_dir
         self.merge_label_dir = merge_label_dir
         self.num_per_image = num_per_image
+        self.mask_out_dir = mask_out_dir
+        self.sd_params = sd_params
+        self._refiner = None
 
     def do_work(self) -> dict:
+        # SD 边缘自然化：勾选时在后台加载模型（可能首次联网下载），合成时直接使用
+        if self.sd_params:
+            from app.services.sd_refine import BoundaryRefiner
+            self._refiner = BoundaryRefiner(
+                model_id=self.sd_params.get("model_id", DEFAULT_MODEL_ID),
+                proxy=self.sd_params.get("proxy", DEFAULT_PROXY),
+            )
+            self._refiner.load()
         total = len(self.target_paths)
         all_annotations: dict[str, list[dict]] = {}
         for i, path in enumerate(self.target_paths):
             out_path = self.output_dir / path.name
-            anns = self.compositor.composite(path, out_path, self.num_per_image)
+            save_mask = (
+                self.mask_out_dir / f"{path.stem}_mask.png"
+                if self.mask_out_dir else None
+            )
+            anns = self.compositor.composite(
+                path, out_path, self.num_per_image,
+                save_mask_to=save_mask,
+                refiner=self._refiner, sd_params=self.sd_params,
+            )
             all_annotations[str(out_path)] = anns
             if self.label_dir and self.merge_label_dir:
                 merge_labels(self.label_dir, path.name, anns, self.merge_label_dir)
@@ -147,6 +171,12 @@ class ImageSynthesisPanel(QWidget):
         # ── 第二步：贴图合成 ──
         layout.addWidget(StrongBodyLabel("贴图合成"))
         layout.addWidget(self._build_composite_card())
+
+        # ── SD 边缘自然化参数（合成时内嵌） ──
+        self._sd_param_card = self._build_sd_param_card()
+        layout.addWidget(self._sd_param_card)
+        self.sd_refine_check.toggled.connect(self._on_sd_refine_toggled)
+        self._on_sd_refine_toggled()
 
         # ── 进度条 ──
         self.progress = ProgressBar()
@@ -246,6 +276,13 @@ class ImageSynthesisPanel(QWidget):
             config_key="syn_merge_label_dir",
         )
         ly.addWidget(self.composite_label_browser)
+
+        self.comp_mask_browser = PathBrowser(
+            label="mask输出目录:", mode="dir",
+            placeholder="目标精确 alpha mask PNG 保存到（SD 边缘自然化用，可选）...",
+            config_key="syn_mask_out_dir",
+        )
+        ly.addWidget(self.comp_mask_browser)
 
         # ── 数量 + 类别 ──
         row1 = QHBoxLayout()
@@ -443,6 +480,20 @@ class ImageSynthesisPanel(QWidget):
         row4.addStretch()
         ly.addLayout(row4)
 
+        # ── SD 边缘自然化（合成时） ──
+        row_sd = QHBoxLayout()
+        self.sd_refine_check = CheckBox("SD 边缘自然化（合成时用精确 alpha 处理贴图边缘）")
+        self.sd_refine_check.setToolTip(
+            "勾选后合成时用精确 alpha 对贴图边缘自然过渡（首次会加载 SD 模型）；"
+            "参数在下方的『SD 边缘自然化参数』卡片配置"
+        )
+        self.sd_refine_check.stateChanged.connect(
+            lambda: set_bool("syn_sd_refine", self.sd_refine_check.isChecked())
+        )
+        row_sd.addWidget(self.sd_refine_check)
+        row_sd.addStretch()
+        ly.addLayout(row_sd)
+
         # ── 操作 ──
         row5 = QHBoxLayout()
         self.composite_status = BodyLabel("")
@@ -453,6 +504,83 @@ class ImageSynthesisPanel(QWidget):
         ly.addLayout(row5)
 
         return card
+
+    def _build_sd_param_card(self) -> CardWidget:
+        """SD 边缘自然化参数卡片（合成时内嵌使用，配置持久化到 sdr_* 键）"""
+        card = CardWidget()
+        ly = QVBoxLayout(card)
+        ly.setContentsMargins(12, 8, 12, 8)
+        ly.setSpacing(8)
+
+        ly.addWidget(StrongBodyLabel("SD 边缘自然化参数"))
+
+        # 环宽 + 姿态保护（拆两行，避免单行过宽顶出水平滚动条）
+        row1 = QHBoxLayout()
+        row1.addWidget(BodyLabel("环宽:"))
+        self.sd_band = SpinBox()
+        self.sd_band.setRange(1, 30)
+        self.sd_band.setValue(4)
+        self.sd_band.setToolTip("目标轮廓外扩像素数，决定 SD 重画环的宽度")
+        self.sd_band.valueChanged.connect(lambda v: set_int("sdr_band", v))
+        row1.addWidget(self.sd_band)
+        row1.addSpacing(18)
+        row1.addWidget(BodyLabel("姿态保护:"))
+        self.sd_keep = SpinBox()
+        self.sd_keep.setRange(0, 10)
+        self.sd_keep.setValue(1)
+        self.sd_keep.setToolTip("轮廓内收缩像素数作为保留区，保护目标姿态细节（尾巴/腿），越大越保护")
+        self.sd_keep.valueChanged.connect(lambda v: set_int("sdr_keep", v))
+        row1.addWidget(self.sd_keep)
+        row1.addStretch()
+        ly.addLayout(row1)
+
+        # 强度 + steps
+        row2 = QHBoxLayout()
+        row2.addWidget(BodyLabel("强度:"))
+        self.sd_strength = DoubleSpinBox()
+        self.sd_strength.setRange(0.1, 1.0)
+        self.sd_strength.setSingleStep(0.05)
+        self.sd_strength.setDecimals(2)
+        self.sd_strength.setValue(0.4)
+        self.sd_strength.setToolTip("越低改动越小（推荐 0.3~0.5）")
+        self.sd_strength.valueChanged.connect(lambda v: set_float("sdr_strength", v))
+        row2.addWidget(self.sd_strength)
+        row2.addSpacing(18)
+        row2.addWidget(BodyLabel("steps:"))
+        self.sd_steps = SpinBox()
+        self.sd_steps.setRange(10, 80)
+        self.sd_steps.setValue(30)
+        self.sd_steps.valueChanged.connect(lambda v: set_int("sdr_steps", v))
+        row2.addWidget(self.sd_steps)
+        row2.addStretch()
+        ly.addLayout(row2)
+
+        # 提示词
+        row3 = QHBoxLayout()
+        row3.addWidget(BodyLabel("提示词:"))
+        self.sd_prompt = LineEdit()
+        self.sd_prompt.setText(DEFAULT_PROMPT)
+        self.sd_prompt.setPlaceholderText("正面提示词（热像/单色等）")
+        self.sd_prompt.setClearButtonEnabled(True)
+        self.sd_prompt.textChanged.connect(lambda v: set_str("sdr_prompt", v))
+        row3.addWidget(self.sd_prompt, 1)
+        ly.addLayout(row3)
+
+        # 负提示词
+        row4 = QHBoxLayout()
+        row4.addWidget(BodyLabel("负提示词:"))
+        self.sd_negative = LineEdit()
+        self.sd_negative.setText(DEFAULT_NEGATIVE_PROMPT)
+        self.sd_negative.setPlaceholderText("负面提示词")
+        self.sd_negative.setClearButtonEnabled(True)
+        self.sd_negative.textChanged.connect(lambda v: set_str("sdr_negative", v))
+        row4.addWidget(self.sd_negative, 1)
+        ly.addLayout(row4)
+
+        return card
+
+    def _on_sd_refine_toggled(self) -> None:
+        self._sd_param_card.setVisible(self.sd_refine_check.isChecked())
 
     # ============================================================
     # 模型加载
@@ -640,11 +768,30 @@ class ImageSynthesisPanel(QWidget):
             f"正在合成 ({len(target_images)} 张, 每张 {self.num_spin.value()} 个)..."
         )
 
+        mask_dir = Path(self.comp_mask_browser.path)
+
+        # SD 边缘自然化参数（由下方 SD 参数卡片配置，持久化到 sdr_* 键）
+        sd_params = None
+        if self.sd_refine_check.isChecked():
+            sd_params = {
+                "model_id": get_str("sdr_model_id", DEFAULT_MODEL_ID),
+                "proxy": get_str("sdr_proxy", DEFAULT_PROXY),
+                "band_px": get_int("sdr_band", 4),
+                "keep_px": get_int("sdr_keep", 1),
+                "steps": get_int("sdr_steps", 30),
+                "strength": get_float("sdr_strength", 0.4),
+                "guidance": get_float("sdr_guidance", 7.5),
+                "prompt": get_str("sdr_prompt", DEFAULT_PROMPT),
+                "negative_prompt": get_str("sdr_negative", DEFAULT_NEGATIVE_PROMPT),
+            }
+
         self._composite_worker = CompositeWorker(
             self._compositor, target_images, out_dir,
             label_dir if has_labels else None,
             merge_label_dir if has_labels else None,
             self.num_spin.value(),
+            mask_dir if mask_dir.is_dir() else None,
+            sd_params,
         )
         self._composite_worker.finished.connect(self._on_composite_done)
         self._composite_worker.error.connect(self._on_composite_error)
@@ -680,6 +827,14 @@ class ImageSynthesisPanel(QWidget):
         self.target_label_browser.setEnabled(enabled)
         self.composite_out_browser.setEnabled(enabled)
         self.composite_label_browser.setEnabled(enabled)
+        self.comp_mask_browser.setEnabled(enabled)
+        self.sd_refine_check.setEnabled(enabled)
+        self.sd_band.setEnabled(enabled)
+        self.sd_keep.setEnabled(enabled)
+        self.sd_strength.setEnabled(enabled)
+        self.sd_steps.setEnabled(enabled)
+        self.sd_prompt.setEnabled(enabled)
+        self.sd_negative.setEnabled(enabled)
         self.num_spin.setEnabled(enabled)
         self.class_id_spin.setEnabled(enabled)
         self.scale_radio.setEnabled(enabled)
@@ -724,6 +879,16 @@ class ImageSynthesisPanel(QWidget):
         self.target_label_browser.path = get_str("syn_target_label_dir")
         self.composite_out_browser.path = get_str("syn_composite_out")
         self.composite_label_browser.path = get_str("syn_merge_label_dir")
+        self.comp_mask_browser.path = get_str("syn_mask_out_dir")
+        self.sd_refine_check.setChecked(get_bool("syn_sd_refine", False))
+        # SD 边缘自然化参数
+        self.sd_band.setValue(get_int("sdr_band", 4))
+        self.sd_keep.setValue(get_int("sdr_keep", 1))
+        self.sd_strength.setValue(get_float("sdr_strength", 0.4))
+        self.sd_steps.setValue(get_int("sdr_steps", 30))
+        self.sd_prompt.setText(get_str("sdr_prompt", DEFAULT_PROMPT))
+        self.sd_negative.setText(get_str("sdr_negative", DEFAULT_NEGATIVE_PROMPT))
+        self._on_sd_refine_toggled()
 
         # 基础参数
         self.num_spin.setValue(get_int("syn_num", 2))

@@ -1,11 +1,19 @@
 """热成像目标合成：SAM 抠图 + 随机贴图 + 标注合并"""
 from __future__ import annotations
 
+import logging
 import random
 from pathlib import Path
 
 import cv2
 import numpy as np
+
+logger = logging.getLogger(__name__)
+
+# SD 边缘自然化默认参数（refiner 传参时仅覆盖显式给定的项）
+from app.services.sd_refine import (
+    DEFAULT_PROMPT, DEFAULT_NEGATIVE_PROMPT,
+)  # noqa: E402
 
 
 # ---- 抠图引擎 ----
@@ -139,13 +147,23 @@ class ImageCompositor:
 
     def composite(
         self, target_path: Path, output_path: Path, num_instances: int = 1,
+        save_mask_to: Path | None = None,
+        refiner=None, sd_params: dict | None = None,
     ) -> list[dict]:
-        """贴入随机实例，返回新增 YOLO 标注列表"""
+        """贴入随机实例，返回新增 YOLO 标注列表。
+
+        save_mask_to: 可选，同时保存整图目标 alpha mask PNG。
+        refiner: 可选 BoundaryRefiner，传入则在**合成时**用精确 alpha 对贴图
+                 边缘做 SD 自然化（不再单独后处理已生成图像）。
+        sd_params: 可选 dict（band_px/keep_px/steps/strength/guidance/prompt/
+                   negative_prompt），仅覆盖 refiner.refine() 默认值。
+        """
         target = cv2.imread(str(target_path))
         if target is None:
             raise ValueError(f"无法读取图片: {target_path}")
         h_t, w_t = target.shape[:2]
         annotations: list[dict] = []
+        mask_acc = np.zeros((h_t, w_t), dtype=np.uint8)  # 目标精确 alpha 累计
 
         for _ in range(num_instances):
             inst_path = random.choice(self.instances)
@@ -187,6 +205,7 @@ class ImageCompositor:
             y = random.randint(0, h_t - h_i)
 
             # ── 融合 ──
+            raw_alpha = instance[:, :, 3].copy()  # 变换后的原始 alpha（未腐蚀羽化）
             alpha = instance[:, :, 3]
             # 腐蚀
             if ks >= 3:
@@ -196,6 +215,11 @@ class ImageCompositor:
             # 羽化
             sigma = ks / 3.0
             alpha = cv2.GaussianBlur(alpha, (ks, ks), sigma)
+
+            # 累计精确 mask（供 SD 边缘自然化）
+            mask_acc[y:y + h_i, x:x + w_i] = np.maximum(
+                mask_acc[y:y + h_i, x:x + w_i], raw_alpha
+            )
 
             # 应用不透明度
             if self._opacity < 1.0:
@@ -243,8 +267,34 @@ class ImageCompositor:
                 "h": h_i / h_t,
             })
 
+        # ── SD 边缘自然化（合成时，用精确 alpha 对贴图边缘自然过渡） ──
+        if refiner is not None and annotations:
+            p = sd_params or {}
+            boxes = [(a["cx"], a["cy"], a["w"], a["h"]) for a in annotations]
+            try:
+                gray = cv2.cvtColor(target, cv2.COLOR_BGR2GRAY)
+                refined = refiner.refine(
+                    gray, boxes,
+                    prompt=p.get("prompt", DEFAULT_PROMPT),
+                    negative_prompt=p.get("negative_prompt", DEFAULT_NEGATIVE_PROMPT),
+                    steps=p.get("steps", 30),
+                    strength=p.get("strength", 0.4),
+                    guidance=p.get("guidance", 7.5),
+                    band_px=p.get("band_px", 4),
+                    keep_px=p.get("keep_px", 1),
+                    obj_mask=mask_acc,
+                )
+                target = cv2.cvtColor(refined, cv2.COLOR_GRAY2BGR)
+            except Exception:
+                logger.exception("SD 边缘自然化失败，保留原始合成结果 [%s]", target_path)
+
         output_path.parent.mkdir(parents=True, exist_ok=True)
         cv2.imwrite(str(output_path), target)
+        if save_mask_to is not None:
+            save_mask_to.parent.mkdir(parents=True, exist_ok=True)
+            ok, buf = cv2.imencode(".png", mask_acc)
+            if ok:
+                buf.tofile(str(save_mask_to))
         return annotations
 
     @staticmethod

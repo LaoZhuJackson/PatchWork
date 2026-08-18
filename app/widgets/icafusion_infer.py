@@ -394,11 +394,10 @@ class ICAFusionInferPanel(QWidget):
         """缩略图点击或导航"""
         # 检查缓存
         if path.stem in self._vis_anns_cache:
-            anns = self._vis_anns_cache[path.stem] if self._current_mode == self.MODE_VIS else self._ir_anns_cache.get(path.stem, [])
-            self.browser.show_annotations(anns)
-            self.status_label.setText(
-                f"{path.name} | 检测到 {len(anns)} 个目标"
-            )
+            self._refresh_viewer()  # 按当前模式显示 VIS 或 IR 图 + 对应标注
+            anns = (self._vis_anns_cache[path.stem] if self._current_mode == self.MODE_VIS
+                    else self._ir_anns_cache.get(path.stem, []))
+            self.status_label.setText(f"{path.name} | 检测到 {len(anns)} 个目标")
             return
 
         if self._engine and self._engine.is_loaded:
@@ -443,9 +442,7 @@ class ICAFusionInferPanel(QWidget):
             self._vis_anns_cache[path.stem] = vis_anns
             self._ir_anns_cache[path.stem] = ir_anns
 
-        # 当前模式决定显示哪个
-        anns = vis_anns if self._current_mode == self.MODE_VIS else ir_anns
-        self.browser.show_annotations(anns)
+        self._refresh_viewer()  # 按当前模式显示图 + 标注
 
         self.status_label.setText(
             f"{path.name if path else '?'} | {len(vis_anns)} 个目标"
@@ -461,33 +458,35 @@ class ICAFusionInferPanel(QWidget):
 
     # ── VIS/IR 切换 ───────────────────────────
 
-    def _on_mode_toggled(self, checked: bool) -> None:
-        """切换 VIS ↔ IR 视图"""
-        self._current_mode = self.MODE_IR if checked else self.MODE_VIS
-        self.mode_toggle.setText("切换 VIS 视图" if checked else "切换 IR 视图")
+    def _refresh_viewer(self) -> None:
+        """按当前模式刷新 viewer 显示图像 + 标注。
 
+        ImageBrowser 切图时默认显示 VIS；若当前是 IR 模式需重新设成 IR 图，
+        否则换组后 IR 图不更新、IR 标注画在 VIS 图上错位、按钮状态失联。
+        """
+        from PySide6.QtGui import QPixmap
         path = self.browser.current_path
         if path is None:
             return
-
-        if checked:
-            # 切换到 IR：需要加载 IR 图片 + IR 标注
+        if self._current_mode == self.MODE_IR:
             ir_path = self._ir_map.get(path.stem)
             if ir_path is not None:
-                from PySide6.QtGui import QPixmap
                 pixmap = QPixmap(str(ir_path))
                 if not pixmap.isNull():
                     self.browser.viewer.set_image(pixmap)
                     ir_anns = self._ir_anns_cache.get(path.stem, [])
                     self.browser.show_annotations(ir_anns)
-        else:
-            # 切换回 VIS
-            from PySide6.QtGui import QPixmap
-            pixmap = QPixmap(str(path))
-            if not pixmap.isNull():
-                self.browser.viewer.set_image(pixmap)
-                vis_anns = self._vis_anns_cache.get(path.stem, [])
-                self.browser.show_annotations(vis_anns)
+                    return
+        # VIS 模式（或 IR 图缺失）：显示 VIS + VIS 标注
+        self.browser.viewer.set_image(QPixmap(str(path)))
+        vis_anns = self._vis_anns_cache.get(path.stem, [])
+        self.browser.show_annotations(vis_anns)
+
+    def _on_mode_toggled(self, checked: bool) -> None:
+        """切换 VIS ↔ IR 视图"""
+        self._current_mode = self.MODE_IR if checked else self.MODE_VIS
+        self.mode_toggle.setText("切换 VIS 视图" if checked else "切换 IR 视图")
+        self._refresh_viewer()
 
     # ── 其他 ───────────────────────────────────
 
