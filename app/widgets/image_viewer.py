@@ -32,6 +32,7 @@ class ImageViewer(QGraphicsView):
     """
 
     clicked = Signal(QPointF)  # 点击信号（仅在 pick 模式下发射场景坐标）
+    rect_drawn = Signal(QRectF)  # 拖拽画框完成信号（仅在 draw 模式下发射场景坐标矩形）
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -61,7 +62,9 @@ class ImageViewer(QGraphicsView):
         self._overlay_items: list = []
         self._is_dragging = False
         self._last_mouse_pos = QPointF()
-        self._interaction_mode = "pan"  # "pan" | "pick"
+        self._interaction_mode = "pan"  # "pan" | "pick" | "draw"
+        self._draw_start: QPointF | None = None
+        self._draw_item = None
 
     # ---- 公共 API ----
     def set_image(self, pixmap: QPixmap | None) -> None:
@@ -76,9 +79,14 @@ class ImageViewer(QGraphicsView):
         self.fitInView(self._scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
 
     def set_interaction_mode(self, mode: str) -> None:
-        """设置交互模式: "pan"(拖拽平移) | "pick"(点击选点)"""
+        """设置交互模式: "pan"(拖拽平移) | "pick"(点击选点) | "draw"(拖拽画框)"""
+        # 离开 draw 时清理未完成的预览矩形
+        if mode != "draw" and self._draw_item is not None:
+            self._scene.removeItem(self._draw_item)
+            self._draw_item = None
+            self._draw_start = None
         self._interaction_mode = mode
-        if mode == "pick":
+        if mode in ("pick", "draw"):
             self.setCursor(Qt.CursorShape.CrossCursor)
         else:
             self.setCursor(Qt.CursorShape.ArrowCursor)
@@ -156,7 +164,22 @@ class ImageViewer(QGraphicsView):
         self.scale(factor, factor)
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
-        if self._interaction_mode == "pick":
+        if self._interaction_mode == "draw":
+            if event.button() == Qt.MouseButton.LeftButton:
+                self._draw_start = self.mapToScene(event.position().toPoint())
+                pen = QPen(QColor(255, 0, 0), 2)
+                pen.setCosmetic(True)
+                self._draw_item = self._scene.addRect(
+                    QRectF(self._draw_start, self._draw_start), pen)
+                event.accept()
+                return
+            elif event.button() == Qt.MouseButton.MiddleButton:
+                self._is_dragging = True
+                self._last_mouse_pos = event.position()
+                self.setCursor(Qt.CursorShape.ClosedHandCursor)
+                event.accept()
+                return
+        elif self._interaction_mode == "pick":
             if event.button() == Qt.MouseButton.LeftButton:
                 scene_pos = self.mapToScene(event.position().toPoint())
                 self.clicked.emit(scene_pos)
@@ -176,6 +199,11 @@ class ImageViewer(QGraphicsView):
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        if self._interaction_mode == "draw" and self._draw_start is not None:
+            cur = self.mapToScene(event.position().toPoint())
+            self._draw_item.setRect(QRectF(self._draw_start, cur).normalized())
+            event.accept()
+            return
         if self._is_dragging:
             delta = event.position() - self._last_mouse_pos
             self._last_mouse_pos = event.position()
@@ -188,7 +216,24 @@ class ImageViewer(QGraphicsView):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
-        if self._interaction_mode == "pick":
+        if self._interaction_mode == "draw":
+            if event.button() == Qt.MouseButton.LeftButton and self._draw_start is not None:
+                cur = self.mapToScene(event.position().toPoint())
+                rect = QRectF(self._draw_start, cur).normalized()
+                if self._draw_item is not None:
+                    self._scene.removeItem(self._draw_item)
+                    self._draw_item = None
+                self._draw_start = None
+                if rect.width() >= 3 and rect.height() >= 3:
+                    self.rect_drawn.emit(rect)
+                event.accept()
+                return
+            elif event.button() == Qt.MouseButton.MiddleButton:
+                self._is_dragging = False
+                self.setCursor(Qt.CursorShape.CrossCursor)
+                event.accept()
+                return
+        elif self._interaction_mode == "pick":
             if event.button() == Qt.MouseButton.MiddleButton:
                 self._is_dragging = False
                 self.setCursor(Qt.CursorShape.CrossCursor)

@@ -32,6 +32,7 @@ from app.widgets.pseudo_thermal import PseudoThermalPanel
 from app.widgets.irvis_annotator import IRVISAnnotatorPanel
 from app.widgets.icafusion_infer import ICAFusionInferPanel
 from app.widgets.icafusion_prepare import ICAFusionPreparePanel
+from app.widgets.sensenova_synth import SenseNovaSynthPanel
 
 from pathlib import Path
 
@@ -127,6 +128,7 @@ class MainWindow(FluentWindow):
             "icafusion_prepare": ICAFusionPreparePanel,
             "sahi_infer": SahiInferPanel,
             "pseudo_thermal": PseudoThermalPanel,
+            "sensenova_synth": SenseNovaSynthPanel,
         }
 
         self._placeholder: dict[str, QWidget] = {}
@@ -277,6 +279,11 @@ class MainWindow(FluentWindow):
         self.addSubInterface(
             self._placeholder["xanylabeling"],
             FIF.LINK, "X-AnyLabeling",
+            position=NavigationItemPosition.SCROLL,
+        )
+        self.addSubInterface(
+            self._placeholder["sensenova_synth"],
+            FIF.EDIT, "AI 目标合成",
             position=NavigationItemPosition.SCROLL,
         )
 

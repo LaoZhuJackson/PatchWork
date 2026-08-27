@@ -61,7 +61,8 @@ app/
 │   ├── presentation.py     # PPT 汇报: calls workspace make_slides.py (validate/inspect/build)
 │   ├── pseudo_thermal.py   # pseudo-thermal IR style transfer (cosine transform)
 │   ├── irvis_annotator.py  # IR-VIS control-point annotation (click-to-pair)
-│   └── icafusion_infer.py  # ICAFusion dual-stream VIS+IR inference panel
+│   ├── icafusion_infer.py  # ICAFusion dual-stream VIS+IR inference panel
+│   └── sensenova_synth.py  # AI 目标合成: SenseNova U1.5 云端红框编辑 (draw box → API → save/export)
 ├── services/               # pure logic, no Qt imports; safe from Worker threads
 │   ├── splitter.py         # find_pairs() + split_dataset()
 │   ├── inference.py        # InferenceEngine: detect + seg, conf/iou params
@@ -81,7 +82,9 @@ app/
 │   ├── presentation.py     # PresentationService: subprocess make_slides.py wrapper
 │   ├── pseudo_thermal.py   # PseudoThermalAug: cosine-transform RGB → pseudo-thermal
 │   ├── irvis_annotator.py  # scan_pairs() + IRVISState + npz save/load
-│   └── icafusion_inference.py # ICAFusionEngine: YOLOv5 TransFusion dual-stream infer
+│   ├── icafusion_inference.py # ICAFusionEngine: YOLOv5 TransFusion dual-stream infer
+│   ├── sensenova.py         # SenseNovaClient: 云端图片编辑 (resolve_key/draw_boxes/build_prompt/nearest_valid_size/edit_image)
+│   └── sensenova_export.py  # export_yolo() / export_xanylabeling() (4 角点, 版本可配)
 └── utils/
     ├── worker.py           # Worker(QThread): override do_work(), signals finished/error/progress
     ├── logger.py           # logging setup + QtLogHandler (WARNING+ → popup)
