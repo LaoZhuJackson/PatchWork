@@ -18,12 +18,11 @@ from PySide6.QtCore import Qt, QRectF
 from PySide6.QtGui import QPixmap, QKeyEvent
 from PySide6.QtWidgets import (
     QFormLayout, QHBoxLayout, QVBoxLayout, QListWidget, QWidget,
-    QPlainTextEdit,
 )
 from qfluentwidgets import (
     BodyLabel, CardWidget, CheckBox, ComboBox, InfoBar, InfoBarPosition,
     LineEdit, PasswordLineEdit, PrimaryPushButton, ProgressBar,
-    PushButton, SpinBox, StrongBodyLabel, SubtitleLabel, ToggleButton,
+    PushButton, SpinBox, StrongBodyLabel, SubtitleLabel, ToggleButton, PlainTextEdit, ListWidget,
 )
 
 from app.services.label_reader import IMAGE_EXTS, get_color
@@ -128,12 +127,12 @@ class SenseNovaSynthPanel(QWidget):
         layout.addWidget(StrongBodyLabel("② 类别定义 (id/name/prompt/detector_class)"))
         cls_card = CardWidget()
         cls_layout = QVBoxLayout(cls_card)
-        self.classes_text = QPlainTextEdit()
+        self.classes_text = PlainTextEdit()
         self.classes_text.setPlaceholderText(
             '[{"id": 0, "name": "光伏面板裂缝", '
             '"prompt": "在光伏面板上生成细长的裂缝，符合自然光伏板会产生的裂缝", '
             '"detector_class": "crack"}]')
-        # self.classes_text.setMaximumHeight(120)
+        self.classes_text.setMinimumHeight(150)
         cls_layout.addWidget(self.classes_text)
 
         cls_row = QHBoxLayout()
@@ -166,8 +165,8 @@ class SenseNovaSynthPanel(QWidget):
         draw_row.addWidget(self.box_count_label)
         draw_layout.addLayout(draw_row)
 
-        self.box_list = QListWidget()
-        # self.box_list.setMaximumHeight(110)
+        self.box_list = ListWidget()
+        self.box_list.setMinimumHeight(110)
         draw_layout.addWidget(self.box_list)
 
         box_btns = QHBoxLayout()
@@ -191,10 +190,10 @@ class SenseNovaSynthPanel(QWidget):
         self.auto_append_chk = CheckBox("自动拼接红框约束提示词（物体在框内/移除红框/保持框外不变）")
         self.auto_append_chk.setChecked(True)
         gen_layout.addWidget(self.auto_append_chk)
-        self.prompt_text = QPlainTextEdit()
+        self.prompt_text = PlainTextEdit()
         self.prompt_text.setReadOnly(True)
         self.prompt_text.setPlaceholderText("提示词预览（随框和类别自动生成）")
-        # self.prompt_text.setMaximumHeight(90)
+        self.prompt_text.setMinimumHeight(90)
         gen_layout.addWidget(self.prompt_text)
 
         gen_row = QHBoxLayout()
